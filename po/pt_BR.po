@@ -1,0 +1,145 @@
+# Brazilian Portuguese translation of Vinci.
+# This file is distributed under the same license as the vinci package.
+msgid ""
+msgstr ""
+"Project-Id-Version: vinci\n"
+"Report-Msgid-Bugs-To: https://github.com/dionatansimioni/vinci/issues\n"
+"POT-Creation-Date: 2026-10-27 23:00+0000\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: crates/app/src/app.rs:55
+msgid "System check"
+msgstr "Verificação do sistema"
+
+#: crates/app/src/app.rs:59
+msgid "Check again"
+msgstr "Verificar novamente"
+
+#: crates/app/src/app.rs:65
+msgid "Continue"
+msgstr "Continuar"
+
+#: crates/app/src/app.rs:118
+msgid "Unknown distribution"
+msgstr "Distribuição desconhecida"
+
+#: crates/app/src/app.rs:123
+msgid "no compatible GPU"
+msgstr "nenhuma GPU compatível"
+
+#: crates/app/src/app.rs:133
+msgid "Everything looks good"
+msgstr "Tudo certo"
+
+#: crates/app/src/app.rs:135
+msgid "This computer meets the requirements for DaVinci Resolve."
+msgstr "Este computador atende aos requisitos do DaVinci Resolve."
+
+#: crates/app/src/messages.rs:19
+msgid "No compatible GPU found"
+msgstr "Nenhuma GPU compatível encontrada"
+
+#: crates/app/src/messages.rs:20
+msgid "DaVinci Resolve needs a GPU with CUDA, ROCm or OpenCL support."
+msgstr ""
+"O DaVinci Resolve precisa de uma GPU com suporte a CUDA, ROCm ou OpenCL."
+
+#: crates/app/src/messages.rs:23
+msgid "proprietary driver required"
+msgstr "driver proprietário necessário"
+
+#: crates/app/src/messages.rs:24
+msgid ""
+"Install the NVIDIA driver from your distribution, restart, then open Vinci "
+"again."
+msgstr ""
+"Instale o driver da NVIDIA pela sua distribuição, reinicie e abra o Vinci "
+"novamente."
+
+#: crates/app/src/messages.rs:27
+msgid "experimental support"
+msgstr "suporte experimental"
+
+#: crates/app/src/messages.rs:28
+msgid ""
+"This GPU is not officially supported by ROCm. Vinci applies a known "
+"workaround, but Resolve may be unstable."
+msgstr ""
+"Esta GPU não é suportada oficialmente pelo ROCm. O Vinci aplica uma solução "
+"conhecida, mas o Resolve pode ficar instável."
+
+#: crates/app/src/messages.rs:31
+msgid "unknown compatibility"
+msgstr "compatibilidade desconhecida"
+
+#: crates/app/src/messages.rs:32
+msgid ""
+"Vinci could not tell whether this GPU works with Resolve. You can try anyway."
+msgstr ""
+"O Vinci não conseguiu determinar se esta GPU funciona com o Resolve. Você "
+"pode tentar mesmo assim."
+
+#: crates/app/src/messages.rs:35
+msgid "not supported"
+msgstr "não suportada"
+
+#: crates/app/src/messages.rs:38
+msgid "AMD GPUs older than Vega are not supported by current ROCm."
+msgstr "GPUs AMD anteriores à Vega não são suportadas pelo ROCm atual."
+
+#: crates/app/src/messages.rs:41
+msgid "Intel GPUs older than 12th generation (Tiger Lake) are not supported."
+msgstr "GPUs Intel anteriores à 12ª geração (Tiger Lake) não são suportadas."
+
+#: crates/app/src/messages.rs:43
+msgid "This display adapter has no compute support."
+msgstr "Este adaptador de vídeo não tem suporte a processamento."
+
+#: crates/app/src/messages.rs:47
+msgid "Multiple GPUs detected"
+msgstr "Várias GPUs detectadas"
+
+#: crates/app/src/messages.rs:48
+msgid "Resolve will run on"
+msgstr "O Resolve vai usar a"
+
+#: crates/app/src/messages.rs:51
+msgid "Low memory"
+msgstr "Pouca memória"
+
+#: crates/app/src/messages.rs:52
+msgid "Blackmagic recommends 16 GiB or more. Large projects may be slow."
+msgstr ""
+"A Blackmagic recomenda 16 GiB ou mais. Projetos grandes podem ficar lentos."
+
+#: crates/app/src/messages.rs:55
+msgid "Very low memory"
+msgstr "Memória muito baixa"
+
+#: crates/app/src/messages.rs:56
+msgid "Resolve may close unexpectedly with less than 8 GiB."
+msgstr "O Resolve pode fechar inesperadamente com menos de 8 GiB."
+
+#: crates/app/src/messages.rs:59
+msgid "Little free space"
+msgstr "Pouco espaço livre"
+
+#: crates/app/src/messages.rs:60
+msgid ""
+"Installing works, but caches and renders need room. 40 GiB or more is "
+"recommended."
+msgstr ""
+"A instalação funciona, mas cache e renderizações precisam de espaço. "
+"Recomenda-se 40 GiB ou mais."
+
+#: crates/app/src/messages.rs:63
+msgid "Not enough free space"
+msgstr "Espaço livre insuficiente"
+
+#: crates/app/src/messages.rs:64
+msgid "At least 12 GiB of free space is required."
+msgstr "São necessários pelo menos 12 GiB de espaço livre."

@@ -1,0 +1,141 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the vinci package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: vinci\n"
+"Report-Msgid-Bugs-To: https://github.com/dionatansimioni/vinci/issues\n"
+"POT-Creation-Date: 2026-10-27 23:00+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=CHARSET\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: crates/app/src/app.rs:55
+msgid "System check"
+msgstr ""
+
+#: crates/app/src/app.rs:59
+msgid "Check again"
+msgstr ""
+
+#: crates/app/src/app.rs:65
+msgid "Continue"
+msgstr ""
+
+#: crates/app/src/app.rs:118
+msgid "Unknown distribution"
+msgstr ""
+
+#: crates/app/src/app.rs:123
+msgid "no compatible GPU"
+msgstr ""
+
+#: crates/app/src/app.rs:133
+msgid "Everything looks good"
+msgstr ""
+
+#: crates/app/src/app.rs:135
+msgid "This computer meets the requirements for DaVinci Resolve."
+msgstr ""
+
+#: crates/app/src/messages.rs:19
+msgid "No compatible GPU found"
+msgstr ""
+
+#: crates/app/src/messages.rs:20
+msgid "DaVinci Resolve needs a GPU with CUDA, ROCm or OpenCL support."
+msgstr ""
+
+#: crates/app/src/messages.rs:23
+msgid "proprietary driver required"
+msgstr ""
+
+#: crates/app/src/messages.rs:24
+msgid ""
+"Install the NVIDIA driver from your distribution, restart, then open Vinci "
+"again."
+msgstr ""
+
+#: crates/app/src/messages.rs:27
+msgid "experimental support"
+msgstr ""
+
+#: crates/app/src/messages.rs:28
+msgid ""
+"This GPU is not officially supported by ROCm. Vinci applies a known "
+"workaround, but Resolve may be unstable."
+msgstr ""
+
+#: crates/app/src/messages.rs:31
+msgid "unknown compatibility"
+msgstr ""
+
+#: crates/app/src/messages.rs:32
+msgid ""
+"Vinci could not tell whether this GPU works with Resolve. You can try anyway."
+msgstr ""
+
+#: crates/app/src/messages.rs:35
+msgid "not supported"
+msgstr ""
+
+#: crates/app/src/messages.rs:38
+msgid "AMD GPUs older than Vega are not supported by current ROCm."
+msgstr ""
+
+#: crates/app/src/messages.rs:41
+msgid "Intel GPUs older than 12th generation (Tiger Lake) are not supported."
+msgstr ""
+
+#: crates/app/src/messages.rs:43
+msgid "This display adapter has no compute support."
+msgstr ""
+
+#: crates/app/src/messages.rs:47
+msgid "Multiple GPUs detected"
+msgstr ""
+
+#: crates/app/src/messages.rs:48
+msgid "Resolve will run on"
+msgstr ""
+
+#: crates/app/src/messages.rs:51
+msgid "Low memory"
+msgstr ""
+
+#: crates/app/src/messages.rs:52
+msgid "Blackmagic recommends 16 GiB or more. Large projects may be slow."
+msgstr ""
+
+#: crates/app/src/messages.rs:55
+msgid "Very low memory"
+msgstr ""
+
+#: crates/app/src/messages.rs:56
+msgid "Resolve may close unexpectedly with less than 8 GiB."
+msgstr ""
+
+#: crates/app/src/messages.rs:59
+msgid "Little free space"
+msgstr ""
+
+#: crates/app/src/messages.rs:60
+msgid ""
+"Installing works, but caches and renders need room. 40 GiB or more is "
+"recommended."
+msgstr ""
+
+#: crates/app/src/messages.rs:63
+msgid "Not enough free space"
+msgstr ""
+
+#: crates/app/src/messages.rs:64
+msgid "At least 12 GiB of free space is required."
+msgstr ""

@@ -1,0 +1,4 @@
+crates/app/src/app.rs
+crates/app/src/i18n.rs
+crates/app/src/main.rs
+crates/app/src/messages.rs
