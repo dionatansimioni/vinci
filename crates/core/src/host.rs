@@ -68,6 +68,26 @@ impl HostRunner {
             mode: ExecMode::detect(),
         }
     }
+
+    /// Runs `argv` on the host as root, asking for the password through polkit.
+    pub fn run_root(&self, argv: &[String]) -> std::io::Result<Output> {
+        exec(&self.mode.wrap_root(argv))
+    }
+
+    /// Starts a long-lived program (e.g. Resolve) without waiting for it.
+    pub fn spawn_detached(&self, argv: &[String]) -> std::io::Result<()> {
+        let argv = self.mode.wrap(argv);
+        let (program, args) = argv
+            .split_first()
+            .ok_or_else(|| std::io::Error::other("empty command"))?;
+        Command::new(program)
+            .args(args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .map(drop)
+    }
 }
 
 impl Default for HostRunner {
@@ -78,18 +98,22 @@ impl Default for HostRunner {
 
 impl Runner for HostRunner {
     fn run(&self, argv: &[String]) -> std::io::Result<Output> {
-        let argv = self.mode.wrap(argv);
-        let (program, args) = argv
-            .split_first()
-            .ok_or_else(|| std::io::Error::other("empty command"))?;
-        let out = Command::new(program).args(args).output()?;
-        Ok(Output {
-            success: out.status.success(),
-            code: out.status.code(),
-            stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
-            stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
-        })
+        exec(&self.mode.wrap(argv))
     }
+}
+
+/// Runs an already-wrapped argv and captures its output.
+fn exec(argv: &[String]) -> std::io::Result<Output> {
+    let (program, args) = argv
+        .split_first()
+        .ok_or_else(|| std::io::Error::other("empty command"))?;
+    let out = Command::new(program).args(args).output()?;
+    Ok(Output {
+        success: out.status.success(),
+        code: out.status.code(),
+        stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
+    })
 }
 
 /// Builds an owned argv from string literals.

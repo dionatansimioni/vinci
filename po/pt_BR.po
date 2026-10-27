@@ -143,3 +143,126 @@ msgstr "Espaço livre insuficiente"
 #: crates/app/src/messages.rs:64
 msgid "At least 12 GiB of free space is required."
 msgstr "São necessários pelo menos 12 GiB de espaço livre."
+
+msgid "A required program could not be started."
+msgstr "Um programa necessário não pôde ser iniciado."
+
+msgid "Adding the GPU driver repository"
+msgstr "Adicionando o repositório do driver da GPU"
+
+msgid "Applying compatibility fixes"
+msgstr "Aplicando correções de compatibilidade"
+
+msgid "Back"
+msgstr "Voltar"
+
+msgid "Cancel"
+msgstr "Cancelar"
+
+msgid "Checking the installation"
+msgstr "Conferindo a instalação"
+
+msgid "Choose file…"
+msgstr "Escolher arquivo…"
+
+msgid "Choose the installer"
+msgstr "Escolha o instalador"
+
+msgid "Could not install"
+msgstr "Não foi possível instalar o"
+
+msgid "Creating the container"
+msgstr "Criando o container"
+
+msgid "DaVinci Resolve installer"
+msgstr "Instalador do DaVinci Resolve"
+
+msgid "DaVinci Resolve is installed"
+msgstr "O DaVinci Resolve está instalado"
+
+msgid "Distrobox (installed in your user folder, no password)"
+msgstr "Distrobox (instalado na sua pasta de usuário, sem senha)"
+
+msgid "Download DaVinci Resolve for Linux from Blackmagic Design's website. Vinci finds the file in your Downloads folder automatically."
+msgstr "Baixe o DaVinci Resolve para Linux no site da Blackmagic Design. O Vinci encontra o arquivo na sua pasta Downloads automaticamente."
+
+msgid "Downloading the base system"
+msgstr "Baixando o sistema base"
+
+msgid "Extracting the installer"
+msgstr "Extraindo o instalador"
+
+msgid "Install"
+msgstr "Instalar"
+
+msgid "Install podman with your distribution's package manager, then open Vinci again."
+msgstr "Instale o podman pelo gerenciador de pacotes da sua distribuição e abra o Vinci novamente."
+
+msgid "Installation failed"
+msgstr "A instalação falhou"
+
+msgid "Installing DaVinci Resolve"
+msgstr "Instalando o DaVinci Resolve"
+
+msgid "Installing libraries and GPU support"
+msgstr "Instalando bibliotecas e suporte à GPU"
+
+msgid "It is in your applications menu. Your projects stay in your home folder."
+msgstr "Ele está no menu de aplicativos. Seus projetos ficam na sua pasta pessoal."
+
+msgid "No installer found in your Downloads folder yet."
+msgstr "Nenhum instalador encontrado na pasta Downloads ainda."
+
+msgid "Open DaVinci Resolve"
+msgstr "Abrir o DaVinci Resolve"
+
+msgid "Open download page"
+msgstr "Abrir página de download"
+
+msgid "Podman (container engine, asks for your password)"
+msgstr "Podman (motor de containers, pede sua senha)"
+
+msgid "Podman is required"
+msgstr "O Podman é necessário"
+
+msgid "Preparing"
+msgstr "Preparando"
+
+msgid "Recreating the container and trying again"
+msgstr "Recriando o container e tentando de novo"
+
+msgid "Removing the previous installation"
+msgstr "Removendo a instalação anterior"
+
+msgid "Resolve was installed, but Vinci could not save its settings."
+msgstr "O Resolve foi instalado, mas o Vinci não conseguiu salvar as configurações."
+
+msgid "Resolve was installed, but the menu entry could not be created."
+msgstr "O Resolve foi instalado, mas o atalho no menu não pôde ser criado."
+
+msgid "Setting up the container"
+msgstr "Configurando o container"
+
+msgid "These tools run DaVinci Resolve in an isolated container:"
+msgstr "Estas ferramentas rodam o DaVinci Resolve em um container isolado:"
+
+msgid "This step failed:"
+msgstr "Este passo falhou:"
+
+msgid "This takes a few minutes. You can keep using your computer."
+msgstr "Isso leva alguns minutos. Você pode continuar usando o computador."
+
+msgid "Try again"
+msgstr "Tentar novamente"
+
+msgid "Trying mirror"
+msgstr "Tentando o espelho"
+
+msgid "Vinci needs to install some tools"
+msgstr "O Vinci precisa instalar algumas ferramentas"
+
+msgid "Waiting for the download to finish in your Downloads folder…"
+msgstr "Aguardando o download terminar na pasta Downloads…"
+
+msgid "distrobox is missing"
+msgstr "o distrobox não foi encontrado"

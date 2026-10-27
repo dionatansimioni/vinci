@@ -83,18 +83,29 @@ pub struct Entry<'a> {
     pub env: &'a BTreeMap<String, String>,
 }
 
-/// The `.desktop` file contents.
-pub fn desktop_file(recipe: &Recipe, e: &Entry) -> String {
+/// The command the menu entry runs, as an argv (also used by the app's "Open" button).
+pub fn command(
+    recipe: &Recipe,
+    distrobox: &str,
+    container: &str,
+    env: &BTreeMap<String, String>,
+) -> Vec<String> {
     let mut argv: Vec<String> = vec![
-        e.distrobox.into(),
+        distrobox.into(),
         "enter".into(),
         "--name".into(),
-        e.container.into(),
+        container.into(),
         "--".into(),
         "env".into(),
     ];
-    argv.extend(e.env.iter().map(|(k, v)| format!("{k}={v}")));
+    argv.extend(env.iter().map(|(k, v)| format!("{k}={v}")));
     argv.push(format!("{}/bin/resolve", recipe.resolve.install_dir));
+    argv
+}
+
+/// The `.desktop` file contents.
+pub fn desktop_file(recipe: &Recipe, e: &Entry) -> String {
+    let argv = command(recipe, e.distrobox, e.container, e.env);
     let exec: Vec<String> = argv.iter().map(|a| quote_exec_arg(a)).collect();
     let mime: String = recipe
         .launcher

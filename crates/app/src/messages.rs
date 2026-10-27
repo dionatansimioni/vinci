@@ -1,8 +1,12 @@
 //! User-facing text for core results. Kept apart from the widgets so it can be tested.
 
 use crate::i18n::tr;
+use rli_core::container::StepKind;
+use rli_core::flow;
 use rli_core::gpu::{Gpu, UnsupportedReason};
 use rli_core::hardware::{Finding, Severity};
+use rli_core::installer_file::{Edition, InstallerFile};
+use rli_core::tools::Action;
 
 pub fn gpu_label(g: &Gpu) -> String {
     g.display_name()
@@ -63,6 +67,61 @@ pub fn finding(f: &Finding) -> (String, String) {
             format!("{} ({})", tr("Not enough free space"), gib(*bytes)),
             tr("At least 12 GiB of free space is required."),
         ),
+    }
+}
+
+pub fn edition_name(e: Edition) -> &'static str {
+    match e {
+        Edition::Free => "DaVinci Resolve",
+        Edition::Studio => "DaVinci Resolve Studio",
+    }
+}
+
+pub fn installer_title(f: &InstallerFile) -> String {
+    format!("{} {}", edition_name(f.edition), f.version)
+}
+
+/// What the progress view says while a step runs.
+pub fn step(kind: StepKind) -> String {
+    match kind {
+        StepKind::PullImage => tr("Downloading the base system"),
+        StepKind::RemoveExisting => tr("Removing the previous installation"),
+        StepKind::Create => tr("Creating the container"),
+        StepKind::Initialize => tr("Setting up the container"),
+        StepKind::AddRepository => tr("Adding the GPU driver repository"),
+        StepKind::InstallPackages => tr("Installing libraries and GPU support"),
+        StepKind::ExtractInstaller => tr("Extracting the installer"),
+        StepKind::InstallResolve => tr("Installing DaVinci Resolve"),
+        StepKind::Verify => tr("Checking the installation"),
+        StepKind::RemoveConflictingLibs => tr("Applying compatibility fixes"),
+    }
+}
+
+pub fn host_action(a: &Action) -> String {
+    match a {
+        Action::InstallPodman { .. } => tr("Podman (container engine, asks for your password)"),
+        Action::InstallDistrobox { .. } => {
+            tr("Distrobox (installed in your user folder, no password)")
+        }
+        Action::ManualPodman { hint } => hint.clone(),
+    }
+}
+
+/// One-line summary of why an install failed.
+pub fn failure(e: &flow::Error) -> String {
+    match e {
+        flow::Error::Step(rli_core::installer::Error::StepFailed { kind, .. }) => {
+            format!("{} {}", tr("This step failed:"), step(*kind))
+        }
+        flow::Error::Step(rli_core::installer::Error::Spawn { .. }) => {
+            tr("A required program could not be started.")
+        }
+        flow::Error::Integrate(_) => {
+            tr("Resolve was installed, but the menu entry could not be created.")
+        }
+        flow::Error::State(_) => {
+            tr("Resolve was installed, but Vinci could not save its settings.")
+        }
     }
 }
 
