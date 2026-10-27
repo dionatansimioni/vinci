@@ -53,6 +53,12 @@ base = [
     "libxcursor1",
     "libxi6",
     "libxtst6",
+    # Reported missing by the 21.1.2 installer's own package check.
+    "libice6",
+    "libsm6",
+    "libxcb-composite0",
+    "libxcb-damage0",
+    "libxcb-xinput0",
 ]
 
 [gpu.nvidia]
@@ -75,6 +81,9 @@ packages = ["intel-opencl-icd"]
 
 [resolve]
 install_dir = "/opt/resolve"
+# -i: no GUI, -y: no prompts, -a: allow root (we run it with sudo inside the box).
+# The installer exits 0 even when it aborts, so the plan verifies the result instead.
+installer_args = ["-i", "-y", "-a"]
 # Bundled libraries that clash with the system ones on Ubuntu (paths relative to install_dir).
 remove_libs = [
     "libs/libglib-2.0.so*",

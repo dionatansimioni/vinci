@@ -18,6 +18,8 @@ pub enum StepKind {
     InstallPackages,
     ExtractInstaller,
     InstallResolve,
+    /// The installer exits 0 even on abort, so check the binary actually landed.
+    Verify,
     RemoveConflictingLibs,
 }
 
@@ -181,14 +183,23 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
             .iter()
             .map(|(k, v)| format!("{k}={v}")),
     );
-    run.extend([
-        run_file.to_string_lossy().into_owned(),
-        "-i".into(),
-        "-y".into(),
-    ]);
+    run.push(run_file.to_string_lossy().into_owned());
+    run.extend(recipe.resolve.installer_args.iter().cloned());
     steps.push(Step {
         kind: StepKind::InstallResolve,
         argv: in_box(t, &name, run),
+    });
+    steps.push(Step {
+        kind: StepKind::Verify,
+        argv: in_box_user(
+            t,
+            &name,
+            s(&[
+                "test",
+                "-x",
+                &format!("{}/bin/resolve", recipe.resolve.install_dir),
+            ]),
+        ),
     });
 
     if !recipe.resolve.remove_libs.is_empty() {
@@ -255,6 +266,7 @@ mod tests {
                 InstallPackages,
                 ExtractInstaller,
                 InstallResolve,
+                Verify,
                 RemoveConflictingLibs
             ]
         );
@@ -273,6 +285,11 @@ mod tests {
         assert!(!install.contains(&"rocm-opencl-runtime".to_string()));
         let run = &plan[5].argv;
         assert!(run.contains(&"SKIP_PACKAGE_CHECK=1".to_string()));
+        assert!(run.ends_with(&["-i".into(), "-y".into(), "-a".into()]));
+        assert_eq!(
+            &plan[6].argv[5..],
+            ["test", "-x", "/opt/resolve/bin/resolve"]
+        );
         assert!(
             run.contains(&"/home/u/.cache/vinci/work/DaVinci_Resolve_21.1.2_Linux.run".to_string())
         );

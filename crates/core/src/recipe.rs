@@ -115,6 +115,7 @@ impl AptRepo {
 #[serde(deny_unknown_fields)]
 pub struct ResolveSetup {
     pub install_dir: String,
+    pub installer_args: Vec<String>,
     #[serde(default)]
     pub remove_libs: Vec<String>,
     #[serde(default)]
@@ -232,6 +233,11 @@ impl Recipe {
         {
             return bad("resolve.install_dir", &self.resolve.install_dir);
         }
+        for arg in &self.resolve.installer_args {
+            if !is_flag(arg) {
+                return bad("resolve.installer_args", arg);
+            }
+        }
         for lib in &self.resolve.remove_libs {
             if lib.starts_with('/') || has_unsafe_path(lib) || lib.is_empty() {
                 return bad("resolve.remove_libs", lib);
@@ -290,6 +296,15 @@ fn is_token(s: &str) -> bool {
     !s.is_empty()
         && s.chars()
             .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+}
+
+/// A bare command-line switch such as `-i` or `--noconfirm` (no values, no shell syntax).
+fn is_flag(s: &str) -> bool {
+    s.len() > 1
+        && s.starts_with('-')
+        && s[1..]
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-')
 }
 
 fn is_package_name(s: &str) -> bool {
@@ -400,6 +415,8 @@ mod tests {
             ),
             ("SKIP_PACKAGE_CHECK = \"1\"", "PATH = \"/tmp/evil\""),
             ("SKIP_PACKAGE_CHECK = \"1\"", "lower = \"1\""),
+            ("\"-a\"]", "\"-C /tmp/x\"]"),
+            ("\"-a\"]", "\"a\"]"),
             (
                 "QT_QPA_PLATFORM = \"xcb\"",
                 "QT_QPA_PLATFORM = \"xcb\\nEVIL=1\"",
