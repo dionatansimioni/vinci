@@ -77,3 +77,33 @@ fn official_validators_accept_our_files() {
         );
     }
 }
+
+/// Every icon name the UI asks for must exist in the Adwaita theme (GNOME runtime and
+/// most desktops), or GTK draws a broken-image placeholder.
+#[test]
+fn ui_icons_exist_in_adwaita() {
+    let theme = Path::new("/usr/share/icons/Adwaita");
+    if !theme.exists() {
+        return;
+    }
+    let mut missing = Vec::new();
+    for entry in std::fs::read_dir(Path::new(ROOT).join("crates/app/src")).unwrap() {
+        let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
+        for (i, _) in text.match_indices("-symbolic\"") {
+            let start = text[..i].rfind('"').unwrap() + 1;
+            let name = &text[start..i + "-symbolic".len()];
+            let found = Command::new("find")
+                .args([theme.to_str().unwrap(), "-name"])
+                .arg(format!("{name}.*"))
+                .output()
+                .is_ok_and(|o| !o.stdout.is_empty());
+            if !found {
+                missing.push(name.to_string());
+            }
+        }
+    }
+    assert!(
+        missing.is_empty(),
+        "icons missing from Adwaita: {missing:?}"
+    );
+}

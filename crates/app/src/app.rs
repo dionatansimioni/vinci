@@ -268,7 +268,7 @@ impl Component for App {
         let check_group = adw::PreferencesGroup::new();
         let installed_group = adw::PreferencesGroup::builder().margin_bottom(24).build();
         let installed_row = adw::ActionRow::new();
-        installed_row.add_prefix(&gtk::Image::from_icon_name("emblem-ok-symbolic"));
+        installed_row.add_prefix(&gtk::Image::from_icon_name("object-select-symbolic"));
         let open_installed = button(&tr("Open"), &["suggested-action"]);
         open_installed.set_valign(gtk::Align::Center);
         open_installed.connect_clicked(input(|| Msg::OpenResolve));
@@ -338,7 +338,7 @@ impl Component for App {
 
         // Done page
         let done_page = adw::StatusPage::builder()
-            .icon_name("emblem-ok-symbolic")
+            .icon_name("object-select-symbolic")
             .title(tr("DaVinci Resolve is installed"))
             .description(tr(
                 "It is in your applications menu. Your projects stay in your home folder.",
@@ -728,7 +728,7 @@ impl Component for App {
                     "This computer meets the requirements for DaVinci Resolve.",
                 ))
                 .build();
-            row.add_prefix(&gtk::Image::from_icon_name("emblem-ok-symbolic"));
+            row.add_prefix(&gtk::Image::from_icon_name("object-select-symbolic"));
             w.check_group.add(&row);
             w.check_rows.push(row);
         }
