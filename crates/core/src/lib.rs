@@ -10,6 +10,7 @@ pub mod ffmpeg;
 pub mod flow;
 pub mod gpu;
 pub mod hardware;
+pub mod health;
 pub mod host;
 pub mod installer;
 pub mod installer_file;
