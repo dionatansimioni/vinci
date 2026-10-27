@@ -1,6 +1,7 @@
 //! Core logic of Vinci, kept free of GUI dependencies so it can be
 //! unit-tested and reused by the background service.
 
+pub mod blackmagic;
 pub mod container;
 pub mod distro;
 pub mod ffmpeg;

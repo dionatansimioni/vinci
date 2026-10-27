@@ -44,6 +44,27 @@ pub fn parse_filename(name: &str) -> Option<(Edition, Version, FileKind)> {
     Some((edition, ver.parse().ok()?, kind))
 }
 
+/// Suffixes browsers use for in-progress downloads (Firefox, Chromium, Epiphany, wget).
+const PARTIAL_SUFFIXES: &[&str] = &[".part", ".crdownload", ".download", ".tmp"];
+
+/// Installers in `dir` that look fully downloaded: non-empty and with no in-progress
+/// sibling (Firefox keeps an empty `name.zip` next to `name.zip.part` while downloading).
+/// Callers should still confirm the size is stable before using one.
+pub fn ready_in_dir(dir: &Path) -> Vec<InstallerFile> {
+    find_in_dir(dir)
+        .into_iter()
+        .filter(|f| {
+            let size = std::fs::metadata(&f.path).map(|m| m.len()).unwrap_or(0);
+            let busy = PARTIAL_SUFFIXES.iter().any(|sfx| {
+                let mut p = f.path.clone().into_os_string();
+                p.push(sfx);
+                Path::new(&p).exists()
+            });
+            size > 0 && !busy
+        })
+        .collect()
+}
+
 /// Finds installer files directly inside `dir`, newest version first.
 /// A `.run` wins over a `.zip` of the same version since it needs no extraction.
 pub fn find_in_dir(dir: &Path) -> Vec<InstallerFile> {
@@ -119,6 +140,25 @@ mod tests {
         assert_eq!(found[0].edition, Edition::Studio);
         assert_eq!(found[0].kind, FileKind::Run);
         assert_eq!(found[2].version.to_string(), "19.1");
+    }
+
+    #[test]
+    fn ignores_downloads_still_in_progress() {
+        let dir = std::env::temp_dir().join(format!("rli-dl-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let w = |n: &str, data: &[u8]| std::fs::write(dir.join(n), data).unwrap();
+        w("DaVinci_Resolve_21.1.2_Linux.zip", b""); // Firefox placeholder
+        w("DaVinci_Resolve_21.1.2_Linux.zip.part", b"partial");
+        w("DaVinci_Resolve_Studio_21.1.2_Linux.zip", b"data");
+        w(
+            "DaVinci_Resolve_Studio_21.1.2_Linux.zip.crdownload",
+            b"partial",
+        );
+        w("DaVinci_Resolve_21.1.1_Linux.zip", b"done");
+        let ready = ready_in_dir(&dir);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(ready.len(), 1);
+        assert_eq!(ready[0].version.to_string(), "21.1.1");
     }
 
     #[test]
