@@ -89,4 +89,4 @@ Este documento registra as decisões de design tomadas antes da implementação.
 
 ## 11. Fatos a verificar
 
-Ver `docs/FACTS.md` (preenchido após pesquisa em fontes primárias).
+Ver [FACTS.md](FACTS.md). Pontos que contradizem decisões estão em revisão com o autor.
