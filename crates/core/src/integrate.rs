@@ -5,12 +5,10 @@ use crate::launcher::{self, Paths};
 use crate::recipe::Recipe;
 use std::path::Path;
 
-/// `$XDG_DATA_HOME`, or `~/.local/share`.
-pub fn data_home(home: &Path) -> std::path::PathBuf {
-    std::env::var_os("XDG_DATA_HOME")
-        .map(std::path::PathBuf::from)
-        .filter(|p| p.is_absolute())
-        .unwrap_or_else(|| home.join(".local/share"))
+/// The host's `$XDG_DATA_HOME` (usually `~/.local/share`), where the desktop looks for
+/// menu entries, icons and MIME types — also when Vinci runs as a Flatpak.
+pub fn data_home(_home: &Path) -> std::path::PathBuf {
+    crate::state::host_xdg_dir("XDG_DATA_HOME", ".local/share")
 }
 
 /// Writes the menu entry and MIME package, copies the icon out of the container, and

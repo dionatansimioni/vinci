@@ -42,13 +42,10 @@ pub struct State {
 }
 
 impl State {
-    /// Default location: `$XDG_STATE_HOME/vinci/state.json`.
+    /// Default location: `$XDG_STATE_HOME/vinci/state.json` of the host, so the Flatpak and
+    /// AppImage builds share it.
     pub fn default_path() -> PathBuf {
-        let base = std::env::var_os("XDG_STATE_HOME")
-            .map(PathBuf::from)
-            .filter(|p| p.is_absolute())
-            .unwrap_or_else(|| home().join(".local/state"));
-        base.join("vinci/state.json")
+        host_xdg_dir("XDG_STATE_HOME", ".local/state").join("vinci/state.json")
     }
 
     /// Loads the state; a missing file means a fresh system.
@@ -93,6 +90,38 @@ impl State {
     }
 }
 
+/// An XDG base directory *of the host*. Inside Flatpak, `XDG_*_HOME` point into the
+/// app's private `~/.var/app/<id>/`, which the desktop never reads; Flatpak exposes the
+/// real ones as `HOST_XDG_*_HOME`.
+pub fn host_xdg_dir(var: &str, default_rel: &str) -> PathBuf {
+    resolve_xdg_dir(
+        var,
+        default_rel,
+        &home(),
+        std::path::Path::new("/.flatpak-info").exists(),
+        |k| std::env::var_os(k),
+    )
+}
+
+fn resolve_xdg_dir(
+    var: &str,
+    default_rel: &str,
+    home: &std::path::Path,
+    in_flatpak: bool,
+    get: impl Fn(&str) -> Option<std::ffi::OsString>,
+) -> PathBuf {
+    let absolute = |v: Option<std::ffi::OsString>| v.map(PathBuf::from).filter(|p| p.is_absolute());
+    if let Some(p) = absolute(get(&format!("HOST_{var}"))) {
+        return p;
+    }
+    if !in_flatpak {
+        if let Some(p) = absolute(get(var)) {
+            return p;
+        }
+    }
+    home.join(default_rel)
+}
+
 pub fn home() -> PathBuf {
     std::env::var_os("HOME")
         .map(PathBuf::from)
@@ -108,6 +137,53 @@ mod tests {
             "rli-state-{}-{name}/state.json",
             std::process::id()
         ))
+    }
+
+    #[test]
+    fn xdg_dirs_point_at_the_host_even_inside_flatpak() {
+        let home = std::path::Path::new("/home/u");
+        fn env<'a>(
+            pairs: &'a [(&'a str, &'a str)],
+        ) -> impl Fn(&str) -> Option<std::ffi::OsString> + 'a {
+            move |k| {
+                pairs
+                    .iter()
+                    .find(|(n, _)| *n == k)
+                    .map(|(_, v)| (*v).into())
+            }
+        }
+        let sandboxed = [("XDG_DATA_HOME", "/home/u/.var/app/io.x/data")];
+        // Flatpak without HOST_ vars: ignore the sandbox path, use the host default.
+        assert_eq!(
+            resolve_xdg_dir("XDG_DATA_HOME", ".local/share", home, true, env(&sandboxed)),
+            PathBuf::from("/home/u/.local/share")
+        );
+        // Flatpak with HOST_ vars: use them.
+        let with_host = [
+            ("XDG_DATA_HOME", "/home/u/.var/app/io.x/data"),
+            ("HOST_XDG_DATA_HOME", "/data/u"),
+        ];
+        assert_eq!(
+            resolve_xdg_dir("XDG_DATA_HOME", ".local/share", home, true, env(&with_host)),
+            PathBuf::from("/data/u")
+        );
+        // Native: honour XDG_*, ignore relative values.
+        let native = [("XDG_STATE_HOME", "/st")];
+        assert_eq!(
+            resolve_xdg_dir("XDG_STATE_HOME", ".local/state", home, false, env(&native)),
+            PathBuf::from("/st")
+        );
+        let relative = [("XDG_STATE_HOME", "rel")];
+        assert_eq!(
+            resolve_xdg_dir(
+                "XDG_STATE_HOME",
+                ".local/state",
+                home,
+                false,
+                env(&relative)
+            ),
+            PathBuf::from("/home/u/.local/state")
+        );
     }
 
     #[test]
