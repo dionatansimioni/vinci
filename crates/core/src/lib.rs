@@ -3,6 +3,7 @@
 
 pub mod blackmagic;
 pub mod container;
+pub mod convert;
 pub mod diagnostics;
 pub mod distro;
 pub mod ffmpeg;
