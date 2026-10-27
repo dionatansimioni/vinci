@@ -132,9 +132,19 @@ fn codec_prefix(codec: VideoCodec) -> &'static str {
     }
 }
 
+/// `<stem>_<suffix>.<ext>` in `out_dir`, or `<stem>_<suffix> (2).<ext>` and so on when
+/// taken. ffmpeg's `-n` exits 0 when it refuses to overwrite, so we never hand it an
+/// existing path in the first place; `-n` stays as a second guard against races.
 fn output_path(input: &Path, out_dir: &Path, suffix: &str, ext: &str) -> PathBuf {
     let stem = input.file_stem().unwrap_or_default().to_string_lossy();
-    out_dir.join(format!("{stem}_{suffix}.{ext}"))
+    let base = format!("{stem}_{suffix}");
+    (1..)
+        .map(|n| match n {
+            1 => out_dir.join(format!("{base}.{ext}")),
+            n => out_dir.join(format!("{base} ({n}).{ext}")),
+        })
+        .find(|p| !p.exists())
+        .expect("an unused name exists")
 }
 
 fn args(parts: &[&str]) -> Vec<String> {
@@ -401,6 +411,18 @@ mod tests {
     }
 
     #[test]
+    fn never_reuses_an_existing_output_name() {
+        let dir = std::env::temp_dir().join(format!("rli-names-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("clip_dnxhr.mov"), "").unwrap();
+        std::fs::write(dir.join("clip_dnxhr (2).mov"), "").unwrap();
+        let (a, out) = import_command(Path::new("/v/clip.mp4"), &dir, ImportPreset::DnxhrHq);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(out, dir.join("clip_dnxhr (3).mov"));
+        assert_eq!(a.last().unwrap(), &out.to_string_lossy());
+    }
+
+    #[test]
     fn export_commands() {
         let input = Path::new("/r/render.mov");
         let (a, out) = export_command(input, Path::new("/o"), ExportPreset::Web, &Encoder::Nvenc);
@@ -512,14 +534,17 @@ mod tests {
             assert_eq!(probe(&out, "v:0"), vcodec, "{preset:?}");
             assert_eq!(probe(&out, "a:0"), "aac", "{preset:?}");
         }
-        // -n: a second run must refuse to overwrite.
-        let (argv, _) = export_command(&render, &dir, ExportPreset::Web, &Encoder::Cpu);
-        assert!(!Command::new(&argv[0])
-            .args(&argv[1..])
-            .output()
-            .unwrap()
-            .status
-            .success());
+        // A second run must not touch the first output: it picks a new name.
+        let first = dir.join("phone_dnxhr_web.mp4");
+        let before = std::fs::metadata(&first).unwrap().modified().unwrap();
+        let (argv, out) = export_command(&render, &dir, ExportPreset::Web, &Encoder::Cpu);
+        assert_eq!(out, dir.join("phone_dnxhr_web (2).mp4"));
+        run(&argv);
+        assert_eq!(
+            std::fs::metadata(&first).unwrap().modified().unwrap(),
+            before
+        );
+        assert_eq!(probe(&out, "v:0"), "h264");
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }
