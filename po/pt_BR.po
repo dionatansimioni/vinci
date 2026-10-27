@@ -398,3 +398,15 @@ msgstr "Isso costuma acontecer depois de atualizar o driver. Reinicie o computad
 
 msgid "Vinci can create it again."
 msgstr "O Vinci pode criá-lo de novo."
+
+msgid "Keep"
+msgstr "Manter"
+
+msgid "Remove"
+msgstr "Remover"
+
+msgid "Remove the previous installation?"
+msgstr "Remover a instalação anterior?"
+
+msgid "{name} is still installed in its own container. Removing it frees disk space; your projects are not affected."
+msgstr "O {name} continua instalado no próprio container. Removê-lo libera espaço em disco; seus projetos não são afetados."

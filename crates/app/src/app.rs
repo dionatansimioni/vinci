@@ -75,6 +75,7 @@ pub enum Msg {
     StartInstall(InstallerFile),
     OpenResolve,
     AskUninstall,
+    RemoveContainer(String),
     Repair(Repair),
     RunHealth,
     Uninstall {
@@ -493,6 +494,17 @@ impl Component for App {
             }
             Msg::StartInstall(file) => self.start_install(file, &sender),
             Msg::AskUninstall => self.ask_uninstall(&sender, root),
+            Msg::RemoveContainer(name) => {
+                sender.spawn_command(move |_| {
+                    let _ = HostRunner::new().run(&[
+                        "podman".into(),
+                        "rm".into(),
+                        "--force".into(),
+                        "--ignore".into(),
+                        name,
+                    ]);
+                });
+            }
             Msg::RunHealth => {
                 let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
                 else {
@@ -600,7 +612,7 @@ impl Component for App {
         }
     }
 
-    fn update_cmd(&mut self, cmd: Cmd, sender: ComponentSender<Self>, _root: &Self::Root) {
+    fn update_cmd(&mut self, cmd: Cmd, sender: ComponentSender<Self>, root: &Self::Root) {
         match cmd {
             Cmd::Downloads(found) => {
                 self.installers = found;
@@ -635,6 +647,9 @@ impl Component for App {
                 self.toasts.add_toast(adw::Toast::new(&text));
             }
             Cmd::Finished(Ok(outcome)) => {
+                if let Some(old) = &outcome.replaced {
+                    self.offer_removing(old.clone(), &sender, root);
+                }
                 self.installed = Some(outcome.installation.clone());
                 self.outcome = Some(outcome);
                 self.page = Page::Done;
@@ -644,7 +659,6 @@ impl Component for App {
                 self.page = Page::Failed;
             }
         }
-        let _ = sender;
     }
 
     fn update_view(&self, w: &mut Widgets, _sender: ComponentSender<Self>) {
@@ -811,6 +825,32 @@ impl App {
             error: self.error.as_ref().map(|(a, b)| (a.as_str(), b.as_str())),
             home: &home,
         })
+    }
+
+    /// After switching edition (Free ↔ Studio), offers to remove the old container, ticked
+    /// by default (SPEC §7). Projects live in the home folder and are not affected.
+    fn offer_removing(
+        &self,
+        old: rli_core::state::Installation,
+        sender: &ComponentSender<Self>,
+        root: &adw::ApplicationWindow,
+    ) {
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Remove the previous installation?")),
+            Some(&tr("{name} is still installed in its own container. Removing it frees disk space; your projects are not affected.")
+                .replace("{name}", &format!("{} {}", messages::edition_name(old.edition), old.version))),
+        );
+        dialog.add_response("keep", &tr("Keep"));
+        dialog.add_response("remove", &tr("Remove"));
+        dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("remove"));
+        let sender = sender.clone();
+        dialog.connect_response(None, move |_, response| {
+            if response == "remove" {
+                sender.input(Msg::RemoveContainer(old.container.clone()));
+            }
+        });
+        dialog.present(Some(root));
     }
 
     /// Confirms the uninstall. Deleting projects is opt-in (unticked) per SPEC §7, and
