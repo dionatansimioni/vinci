@@ -126,6 +126,8 @@ pub struct ResolveSetup {
 #[serde(deny_unknown_fields)]
 pub struct Launcher {
     #[serde(default)]
+    pub icon: Option<String>,
+    #[serde(default)]
     pub mime_types: Vec<String>,
     #[serde(default)]
     pub env: BTreeMap<String, String>,
@@ -241,6 +243,11 @@ impl Recipe {
         for lib in &self.resolve.remove_libs {
             if lib.starts_with('/') || has_unsafe_path(lib) || lib.is_empty() {
                 return bad("resolve.remove_libs", lib);
+            }
+        }
+        if let Some(icon) = &self.launcher.icon {
+            if icon.starts_with('/') || has_unsafe_path(icon) || icon.is_empty() {
+                return bad("launcher.icon", icon);
             }
         }
         let envs = vendors
@@ -417,6 +424,7 @@ mod tests {
             ("SKIP_PACKAGE_CHECK = \"1\"", "lower = \"1\""),
             ("\"-a\"]", "\"-C /tmp/x\"]"),
             ("\"-a\"]", "\"a\"]"),
+            ("\"graphics/DV_Resolve.png\"", "\"../../etc/shadow\""),
             (
                 "QT_QPA_PLATFORM = \"xcb\"",
                 "QT_QPA_PLATFORM = \"xcb\\nEVIL=1\"",

@@ -149,7 +149,7 @@ pub fn paths(data_home: &Path) -> Paths {
     Paths {
         desktop: data_home.join(format!("applications/{DESKTOP_ID}.desktop")),
         mime: data_home.join(format!("mime/packages/{MIME_XML_NAME}")),
-        icon: data_home.join(format!("icons/hicolor/256x256/apps/{ICON_NAME}.png")),
+        icon: data_home.join(format!("icons/hicolor/128x128/apps/{ICON_NAME}.png")),
     }
 }
 
@@ -281,5 +281,9 @@ mod tests {
         assert!(p
             .desktop
             .ends_with("applications/io.github.dionatansimioni.Vinci.Resolve.desktop"));
+        // DV_Resolve.png is 128x128; the icon theme spec wants it in the matching dir.
+        assert!(p
+            .icon
+            .ends_with("icons/hicolor/128x128/apps/io.github.dionatansimioni.Vinci.Resolve.png"));
     }
 }

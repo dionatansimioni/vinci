@@ -95,6 +95,8 @@ remove_libs = [
 SKIP_PACKAGE_CHECK = "1"
 
 [launcher]
+# Relative to resolve.install_dir; copied to the host icon theme.
+icon = "graphics/DV_Resolve.png"
 mime_types = ["application/x-resolveproj", "application/x-resolvetimeline"]
 
 [launcher.env]

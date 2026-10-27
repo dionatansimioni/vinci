@@ -10,6 +10,7 @@ pub mod hardware;
 pub mod host;
 pub mod installer;
 pub mod installer_file;
+pub mod integrate;
 pub mod known_bad;
 pub mod launcher;
 pub mod recipe;
