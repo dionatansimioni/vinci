@@ -25,3 +25,4 @@ pub mod state;
 pub mod tools;
 pub mod uninstall;
 pub mod version;
+pub mod watch;
