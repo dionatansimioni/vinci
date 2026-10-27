@@ -36,7 +36,9 @@ Este documento registra as decisões de design tomadas antes da implementação.
 
 ## 4. Container
 
-- distrobox sobre podman; imagem **Rocky Linux 9** com tag fixada.
+- distrobox sobre podman; imagem **Ubuntu 24.04 LTS** com tag fixada, para todas as GPUs.
+  - Motivo (ver FACTS.md): ROCm tem o Ubuntu como distro principal, a Intel publica o NEO em .deb para Ubuntu, e o ffmpeg completo já vem no repositório. Rocky 8.6 é o único listado pela Blackmagic, mas não tem ROCm/NEO atuais.
+  - Correções necessárias: `SKIP_PACKAGE_CHECK=1` no instalador e remoção das libs glib/gio embutidas que conflitam com o sistema.
 - Home compartilhada com o host (padrão do distrobox).
 - Uma instalação ativa do Resolve por vez, uma por container.
 
@@ -74,7 +76,7 @@ Este documento registra as decisões de design tomadas antes da implementação.
 
 ## 9. Codecs
 
-- ffmpeg do **RPM Fusion dentro do container** (nada redistribuído por nós), com NVENC/VAAPI/QSV quando disponível e fallback CPU.
+- ffmpeg do **repositório do Ubuntu dentro do container** (nada redistribuído por nós), com NVENC/VAAPI/QSV quando disponível e fallback CPU.
 - Aba **Preparar mídia** (importação): converte para intermediário escolhível — DNxHR HQ, ProRes 422, ou "só áudio" (AAC→PCM). Padrão conforme o sistema: Studio + NVIDIA → "só áudio"; demais → DNxHR HQ.
 - Motivo: AAC não funciona em nenhuma edição; H.264/H.265 só decodifica no Studio e só codifica no Studio com NVIDIA.
 - **Pasta monitorada de importação** e **pasta monitorada de exportação**.
