@@ -20,4 +20,5 @@ pub mod recipe;
 pub mod remote;
 pub mod state;
 pub mod tools;
+pub mod uninstall;
 pub mod version;
