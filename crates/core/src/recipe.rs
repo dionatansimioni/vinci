@@ -459,27 +459,34 @@ mod tests {
         }
 
         fn remote_text(revision: u32) -> String {
-            BUNDLED.replacen("revision = 1", &format!("revision = {revision}"), 1)
+            BUNDLED.replacen(
+                &format!("revision = {}", Recipe::bundled().revision),
+                &format!("revision = {revision}"),
+                1,
+            )
         }
 
         #[test]
         fn accepts_newer_signed_recipe() {
             let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let text = remote_text(5);
+            let text = remote_text(Recipe::bundled().revision + 5);
             let sig = sign(&text, &kp);
             let (r, src, err) = choose(
                 Recipe::bundled(),
                 Some((&text, &sig)),
                 Some(&kp.pk.to_base64()),
             );
-            assert_eq!((r.revision, src, err), (5, Source::Remote, None));
+            assert_eq!(
+                (r.revision, src, err),
+                (Recipe::bundled().revision + 5, Source::Remote, None)
+            );
         }
 
         #[test]
         fn rejects_tampered_or_foreign_signature() {
             let kp = KeyPair::generate_unencrypted_keypair().unwrap();
             let other = KeyPair::generate_unencrypted_keypair().unwrap();
-            let text = remote_text(5);
+            let text = remote_text(Recipe::bundled().revision + 5);
             let sig = sign(&text, &kp);
             let tampered = text.replace("ffmpeg", "ffmpeg-evil");
             let (r, src, err) = choose(
@@ -489,7 +496,11 @@ mod tests {
             );
             assert_eq!(
                 (r.revision, src, err),
-                (1, Source::Bundled, Some(RecipeError::Signature))
+                (
+                    Recipe::bundled().revision,
+                    Source::Bundled,
+                    Some(RecipeError::Signature)
+                )
             );
             let (_, src, err) = choose(
                 Recipe::bundled(),
@@ -502,7 +513,7 @@ mod tests {
         #[test]
         fn ignores_older_or_equal_revision_and_missing_key() {
             let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let text = remote_text(1);
+            let text = remote_text(Recipe::bundled().revision);
             let sig = sign(&text, &kp);
             let (_, src, err) = choose(
                 Recipe::bundled(),

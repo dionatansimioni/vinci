@@ -197,8 +197,11 @@ mod tests {
         use std::io::Cursor;
 
         fn signed(revision: u32, kp: &KeyPair) -> (String, String) {
-            let text =
-                recipe::BUNDLED.replacen("revision = 1", &format!("revision = {revision}"), 1);
+            let text = recipe::BUNDLED.replacen(
+                &format!("revision = {}", Recipe::bundled().revision),
+                &format!("revision = {revision}"),
+                1,
+            );
             let sig = minisign::sign(
                 Some(&kp.pk),
                 &kp.sk,
@@ -219,23 +222,29 @@ mod tests {
         fn caches_verified_recipe_and_uses_it_offline() {
             let kp = KeyPair::generate_unencrypted_keypair().unwrap();
             let pk = kp.pk.to_base64();
-            let (text, sig) = signed(7, &kp);
+            let (text, sig) = signed(Recipe::bundled().revision + 5, &kp);
             let dir = cache("offline");
             let online = Map::default()
                 .with(recipe::REMOTE_URL, &text)
                 .with(recipe::REMOTE_SIG_URL, &sig);
             let (r, src, _) = effective_recipe(&online, &dir, Some(&pk));
-            assert_eq!((r.revision, src), (7, Source::Remote));
+            assert_eq!(
+                (r.revision, src),
+                (Recipe::bundled().revision + 5, Source::Remote)
+            );
 
             let (r, src, err) = effective_recipe(&Map::default(), &dir, Some(&pk));
             let _ = std::fs::remove_dir_all(&dir);
-            assert_eq!((r.revision, src, err), (7, Source::Remote, None));
+            assert_eq!(
+                (r.revision, src, err),
+                (Recipe::bundled().revision + 5, Source::Remote, None)
+            );
         }
 
         #[test]
         fn tampered_cache_is_rejected() {
             let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let (text, sig) = signed(7, &kp);
+            let (text, sig) = signed(Recipe::bundled().revision + 5, &kp);
             let dir = cache("tampered");
             std::fs::create_dir_all(&dir).unwrap();
             std::fs::write(dir.join("recipe.toml"), text.replace("ffmpeg", "evil")).unwrap();
@@ -244,7 +253,11 @@ mod tests {
             let _ = std::fs::remove_dir_all(&dir);
             assert_eq!(
                 (r.revision, src, err),
-                (1, Source::Bundled, Some(RecipeError::Signature))
+                (
+                    Recipe::bundled().revision,
+                    Source::Bundled,
+                    Some(RecipeError::Signature)
+                )
             );
         }
 

@@ -5,7 +5,7 @@
 # Bump `revision` on every change; bump `schema` only when the format changes.
 
 schema = 1
-revision = 1
+revision = 2
 
 [container]
 image = "docker.io/library/ubuntu:24.04"
@@ -59,6 +59,13 @@ base = [
     "libxcb-composite0",
     "libxcb-damage0",
     "libxcb-xinput0",
+    # Found with scripts/missing-libs.sh on a clean container (21.1.2): USD plugin (libXt),
+    # Chromium-based graphics host (NSS/NSPR, xkbfile, GLES).
+    "libxt6t64",
+    "libnss3",
+    "libnspr4",
+    "libxkbfile1",
+    "libgles2",
 ]
 
 [gpu.nvidia]
