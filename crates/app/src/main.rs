@@ -1,5 +1,6 @@
 mod app;
 mod i18n;
+mod media;
 mod messages;
 
 use relm4::RelmApp;

@@ -281,3 +281,63 @@ msgstr "O DaVinci Resolve {version} está disponível"
 
 msgid "Version {version} has known problems. Keep your current version for now."
 msgstr "A versão {version} tem problemas conhecidos. Mantenha a versão atual por enquanto."
+
+msgid "Add files…"
+msgstr "Adicionar arquivos…"
+
+msgid "Clear list"
+msgstr "Limpar lista"
+
+msgid "Convert"
+msgstr "Converter"
+
+msgid "Convert to"
+msgstr "Converter para"
+
+msgid "Converting…"
+msgstr "Convertendo…"
+
+msgid "Custom"
+msgstr "Personalizado"
+
+msgid "Failed:"
+msgstr "Falhou:"
+
+msgid "For editing: DNxHR HQ (works in every edition)"
+msgstr "Para editar: DNxHR HQ (funciona em qualquer edição)"
+
+msgid "For editing: ProRes 422"
+msgstr "Para editar: ProRes 422"
+
+msgid "For editing: fix audio only (Studio with NVIDIA)"
+msgstr "Para editar: corrigir só o áudio (Studio com NVIDIA)"
+
+msgid "For publishing: MP4 H.264 (YouTube, web)"
+msgstr "Para publicar: MP4 H.264 (YouTube, web)"
+
+msgid "For publishing: MP4 H.265 (smaller files)"
+msgstr "Para publicar: MP4 H.265 (arquivos menores)"
+
+msgid "Install DaVinci Resolve with Vinci first."
+msgstr "Instale o DaVinci Resolve pelo Vinci primeiro."
+
+msgid "Installation"
+msgstr "Instalação"
+
+msgid "Media"
+msgstr "Mídia"
+
+msgid "On Linux, DaVinci Resolve can't open AAC audio, and the free edition can't open H.264/H.265 video, which phones and most cameras record. Convert those files here before importing them, or turn your renders into MP4."
+msgstr "No Linux, o DaVinci Resolve não abre áudio AAC, e a edição gratuita não abre vídeo H.264/H.265, o formato de celulares e da maioria das câmeras. Converta esses arquivos aqui antes de importá-los, ou transforme suas renderizações em MP4."
+
+msgid "Prepare media"
+msgstr "Preparar mídia"
+
+msgid "Saved as"
+msgstr "Salvo como"
+
+msgid "Video and audio"
+msgstr "Vídeo e áudio"
+
+msgid "Waiting"
+msgstr "Aguardando"

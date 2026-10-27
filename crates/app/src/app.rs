@@ -1,6 +1,7 @@
 //! Main window: system check → choose installer → (host setup) → progress → done/error.
 
 use crate::i18n::tr;
+use crate::media::Media;
 use crate::messages;
 use relm4::adw;
 use relm4::adw::prelude::*;
@@ -56,6 +57,7 @@ pub struct App {
     outcome: Option<Outcome>,
     error: Option<(String, String)>,
     toasts: adw::ToastOverlay,
+    _media: Controller<Media>,
     installed: Option<rli_core::state::Installation>,
     update: Option<UpdateInfo>,
 }
@@ -219,6 +221,8 @@ impl Component for App {
     fn init(_: (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let (report, gpus, distro) = probe();
         let toasts = adw::ToastOverlay::new();
+        let media = Media::builder().launch(report.chosen_gpu.clone()).detach();
+        let media_root = media.widget().clone();
         let model = App {
             page: Page::Check,
             report,
@@ -230,6 +234,7 @@ impl Component for App {
             outcome: None,
             error: None,
             toasts: toasts.clone(),
+            _media: media,
             installed: State::load(&State::default_path())
                 .ok()
                 .and_then(|s| s.installation),
@@ -350,10 +355,21 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(Msg::Proceed)
         });
+        let views = adw::ViewStack::new();
+        let install_page = views.add_titled(&stack, Some("install"), &tr("Installation"));
+        install_page.set_icon_name(Some("system-software-install-symbolic"));
+        let media_page = views.add_titled(&media_root, Some("media"), &tr("Media"));
+        media_page.set_icon_name(Some("video-x-generic-symbolic"));
+        let switcher = adw::ViewSwitcher::builder()
+            .stack(&views)
+            .policy(adw::ViewSwitcherPolicy::Wide)
+            .build();
+        let header = adw::HeaderBar::new();
+        header.set_title_widget(Some(&switcher));
         let toolbar = adw::ToolbarView::new();
-        toolbar.add_top_bar(&adw::HeaderBar::new());
+        toolbar.add_top_bar(&header);
         toolbar.add_top_bar(&banner);
-        toasts.set_child(Some(&stack));
+        toasts.set_child(Some(&views));
         toolbar.set_content(Some(&toasts));
         root.set_content(Some(&toolbar));
 
