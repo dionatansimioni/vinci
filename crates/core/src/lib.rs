@@ -3,6 +3,7 @@
 
 pub mod container;
 pub mod distro;
+pub mod ffmpeg;
 pub mod gpu;
 pub mod hardware;
 pub mod host;
