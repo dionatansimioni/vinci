@@ -17,4 +17,4 @@ diretórios XDG **do host** (`HOST_XDG_DATA_HOME`).
 
 ## AppImage (plano B)
 
-Veja `build-aux/appimage/build.sh`.
+`build-aux/appimage/build.sh` compila dentro de um container Ubuntu 24.04 e empacota com linuxdeploy + plugin GTK (versões fixadas). **Ainda não executado**: precisa ser validado antes do primeiro release.
