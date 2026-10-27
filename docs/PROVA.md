@@ -61,9 +61,17 @@ Bugs que só a execução real revelou (todos corrigidos, com teste):
 
 Conversão de mídia testada dentro do container: todos os presets, progresso ao vivo e API da Blackmagic pela rede do container.
 
+## Terceira rodada — atalho, reparo e container limpo
+
+- **Abrir pelo atalho**: a linha `Exec=` gerada, executada num X do host, abriu o Resolve direto no Gerenciador de Projetos com `Selected compute API: CUDA`.
+- **Bug achado só num container limpo**: "Unable to load plugin: USD.plugin — libXt.so.6". A primeira prova escondia isso porque o `xvfb` instalado à mão trazia a libXt. `scripts/missing-libs.sh` varre todos os binários/plugins com `ldd`; a receita (revisão 2) ganhou `libxt6t64 libnss3 libnspr4 libxkbfile1 libgles2` e a varredura passou a sair vazia.
+- **Autodiagnóstico**: apagado o atalho, o Vinci mostrou "O atalho no menu sumiu" com **Reparar**; o reparo recriou o atalho (com caminho absoluto do distrobox).
+- **Lição**: "crash" visto ao encerrar o Resolve com `SIGTERM` é o manipulador de sinal dele, não uma falha; testes usam `SIGKILL`.
+
 ## Ainda não testado
 
 - podman **rootless** com usuário comum (caminho real dos usuários).
 - AMD (ROCm) e Intel (NEO): sem hardware nesta máquina.
 - Edição Studio (ativação/dongle).
-- Lançador `.desktop` abrindo o Resolve numa sessão gráfica real.
+- Sessão gráfica real (GNOME/KDE em Wayland com XWayland) — testado só em Xvfb.
+- Build Flatpak e AppImage (scripts prontos; build bloqueado pela política de permissões da sessão).
