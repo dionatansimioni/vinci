@@ -126,6 +126,57 @@ impl Gpu {
     }
 }
 
+/// Locations of the PCI ID database across distros (and the host, seen from a Flatpak).
+const PCI_IDS: &[&str] = &[
+    "/usr/share/hwdata/pci.ids",
+    "/usr/share/misc/pci.ids",
+    "/run/host/usr/share/hwdata/pci.ids",
+    "/run/host/usr/share/misc/pci.ids",
+];
+
+/// Marketing name from a `pci.ids` database, preferring the bracketed part
+/// (`GA106 [RTX A2000 12GB]` → `RTX A2000 12GB`).
+pub fn model_name_from(pci_ids: &str, vendor: u16, device: u16) -> Option<String> {
+    let vendor_hdr = format!("{vendor:04x}  ");
+    let device_hdr = format!("\t{device:04x}  ");
+    let name = pci_ids
+        .lines()
+        .skip_while(|l| !l.starts_with(&vendor_hdr))
+        .skip(1)
+        .take_while(|l| l.starts_with('\t') || l.starts_with('#') || l.is_empty())
+        .find_map(|l| l.strip_prefix(&device_hdr))?
+        .trim();
+    let short = name
+        .rsplit_once('[')
+        .and_then(|(_, rest)| rest.strip_suffix(']'))
+        .unwrap_or(name);
+    Some(short.to_string())
+}
+
+impl Gpu {
+    fn pci_vendor_id(&self) -> u16 {
+        match self.vendor {
+            Vendor::Nvidia => 0x10de,
+            Vendor::Amd => 0x1002,
+            Vendor::Intel => 0x8086,
+            Vendor::Other(id) => id,
+        }
+    }
+
+    /// Human-readable name such as "NVIDIA RTX A2000 12GB", or "NVIDIA 2571" when the
+    /// PCI ID database is missing.
+    pub fn display_name(&self) -> String {
+        let model = PCI_IDS.iter().find_map(|p| {
+            let text = std::fs::read_to_string(p).ok()?;
+            model_name_from(&text, self.pci_vendor_id(), self.device_id)
+        });
+        match model {
+            Some(m) => format!("{} {m}", self.vendor.name()),
+            None => format!("{} {:04x}", self.vendor.name(), self.device_id),
+        }
+    }
+}
+
 fn classify_amd(target: u32) -> Support {
     let (major, minor) = (target / 10000, (target / 100) % 100);
     match (major, minor) {
@@ -267,6 +318,29 @@ mod tests {
             amd_gfx_target: Some(target),
             ..gpu(Vendor::Amd, 0x73bf, "amdgpu")
         }
+    }
+
+    #[test]
+    fn reads_model_names_from_pci_ids() {
+        let db = "# comment\n10de  NVIDIA Corporation\n\t2571  GA106 [RTX A2000 12GB]\n\t\t1028 1611  subsystem\n\t2684  AD102 [GeForce RTX 4090]\n1002  Advanced Micro Devices, Inc. [AMD/ATI]\n\t2571  Not this one\n\t744c  Navi 31 [Radeon RX 7900 XT/7900 XTX/7900 GRE/7900M]\n8086  Intel Corporation\n\t1234  Plain Name\n";
+        assert_eq!(
+            model_name_from(db, 0x10de, 0x2571).as_deref(),
+            Some("RTX A2000 12GB")
+        );
+        assert_eq!(
+            model_name_from(db, 0x10de, 0x2684).as_deref(),
+            Some("GeForce RTX 4090")
+        );
+        assert_eq!(
+            model_name_from(db, 0x1002, 0x744c).as_deref(),
+            Some("Radeon RX 7900 XT/7900 XTX/7900 GRE/7900M")
+        );
+        assert_eq!(
+            model_name_from(db, 0x8086, 0x1234).as_deref(),
+            Some("Plain Name")
+        );
+        assert_eq!(model_name_from(db, 0x10de, 0xffff), None);
+        assert_eq!(model_name_from(db, 0x1af4, 0x2571), None);
     }
 
     #[test]

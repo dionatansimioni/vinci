@@ -5,7 +5,7 @@ use rli_core::gpu::{Gpu, UnsupportedReason};
 use rli_core::hardware::{Finding, Severity};
 
 pub fn gpu_label(g: &Gpu) -> String {
-    format!("{} {:04x}", g.vendor.name(), g.device_id)
+    g.display_name()
 }
 
 fn gib(bytes: u64) -> String {
@@ -122,6 +122,6 @@ mod tests {
             finding(&Finding::LowRam { bytes: 12 << 30 }).0,
             "Low memory (12 GiB)"
         );
-        assert_eq!(gpu_label(&gpu()), "AMD 731f");
+        assert!(gpu_label(&gpu()).starts_with("AMD "));
     }
 }
