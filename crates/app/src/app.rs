@@ -17,7 +17,7 @@ use rli_core::installer_file::{self, parse_filename, InstallerFile};
 use rli_core::recipe::Recipe;
 use rli_core::state::{self, State, ToolSource};
 use rli_core::tools::{self, Action};
-use rli_core::{integrate, launcher};
+use rli_core::{diagnostics, integrate, launcher};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -54,6 +54,7 @@ pub struct App {
     progress: (usize, usize, String),
     outcome: Option<Outcome>,
     error: Option<(String, String)>,
+    toasts: adw::ToastOverlay,
 }
 
 #[derive(Debug)]
@@ -66,6 +67,7 @@ pub enum Msg {
     Install(usize),
     StartInstall(InstallerFile),
     OpenResolve,
+    CopyReport,
     Back,
 }
 
@@ -211,6 +213,7 @@ impl Component for App {
 
     fn init(_: (), root: Self::Root, sender: ComponentSender<Self>) -> ComponentParts<Self> {
         let (report, gpus, distro) = probe();
+        let toasts = adw::ToastOverlay::new();
         let model = App {
             page: Page::Check,
             report,
@@ -221,6 +224,7 @@ impl Component for App {
             progress: (0, 1, String::new()),
             outcome: None,
             error: None,
+            toasts: toasts.clone(),
         };
         let input = |m: fn() -> Msg| {
             let sender = sender.clone();
@@ -237,10 +241,13 @@ impl Component for App {
         recheck.connect_clicked(input(|| Msg::Recheck));
         let proceed = button(&tr("Continue"), &["suggested-action", "pill"]);
         proceed.connect_clicked(input(|| Msg::Proceed));
+        let report_check = button(&tr("Copy diagnostic report"), &["flat"]);
+        report_check.connect_clicked(input(|| Msg::CopyReport));
         let check_page = page_box(&[
             status.upcast_ref(),
             check_group.upcast_ref(),
             button_row(&[&recheck, &proceed]).upcast_ref(),
+            button_row(&[&report_check]).upcast_ref(),
         ]);
 
         // Source page
@@ -312,10 +319,12 @@ impl Component for App {
             .build();
         let retry = button(&tr("Try again"), &["pill"]);
         retry.connect_clicked(input(|| Msg::Proceed));
+        let report_failed = button(&tr("Copy diagnostic report"), &["pill"]);
+        report_failed.connect_clicked(input(|| Msg::CopyReport));
         let failed_box = page_box(&[
             failed_page.upcast_ref(),
             failed_details.upcast_ref(),
-            button_row(&[&retry]).upcast_ref(),
+            button_row(&[&report_failed, &retry]).upcast_ref(),
         ]);
 
         let stack = gtk::Stack::builder()
@@ -329,7 +338,8 @@ impl Component for App {
 
         let toolbar = adw::ToolbarView::new();
         toolbar.add_top_bar(&adw::HeaderBar::new());
-        toolbar.set_content(Some(&stack));
+        toasts.set_child(Some(&stack));
+        toolbar.set_content(Some(&toasts));
         root.set_content(Some(&toolbar));
 
         let mut widgets = Widgets {
@@ -406,6 +416,12 @@ impl Component for App {
                 }
             }
             Msg::StartInstall(file) => self.start_install(file, &sender),
+            Msg::CopyReport => {
+                root.clipboard().set_text(&self.diagnostic_report());
+                self.toasts.add_toast(adw::Toast::new(&tr(
+                    "Diagnostic report copied. Paste it in your issue or message.",
+                )));
+            }
             Msg::OpenResolve => {
                 if let (Some(o), Some(g)) = (&self.outcome, self.chosen_gpu()) {
                     let recipe = Recipe::bundled();
@@ -537,6 +553,26 @@ impl Component for App {
 }
 
 impl App {
+    fn diagnostic_report(&self) -> String {
+        let recipe = Recipe::bundled();
+        let home = state::home();
+        let tools = tools::detect(&HostRunner::new(), &recipe, &home);
+        let st = State::load(&State::default_path()).unwrap_or_default();
+        diagnostics::report(&diagnostics::Input {
+            app_version: env!("CARGO_PKG_VERSION"),
+            recipe_revision: recipe.revision,
+            distro: self.distro.as_ref(),
+            gpus: &self.gpus,
+            report: &self.report,
+            ram_bytes: hardware::read_ram(),
+            free_disk_bytes: hardware::free_disk(&home),
+            tools: Some(&tools),
+            state: &st,
+            error: self.error.as_ref().map(|(a, b)| (a.as_str(), b.as_str())),
+            home: &home,
+        })
+    }
+
     /// Shows what will be installed on the host and asks first (SPEC §3); skips straight
     /// to the install when nothing is missing.
     fn confirm_host_setup(
