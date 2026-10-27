@@ -140,7 +140,7 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
     let mut install = s(&[
         "sh",
         "-c",
-        r#"set -e; export DEBIAN_FRONTEND=noninteractive; apt-get update; apt-get install -y --no-install-recommends "$@""#,
+        r#"set -e; export DEBIAN_FRONTEND=noninteractive; apt-get update --error-on=any; apt-get install -y --no-install-recommends "$@""#,
         "sh",
     ]);
     install.extend(packages.iter().map(|p| p.to_string()));
@@ -281,6 +281,12 @@ mod tests {
             ["distrobox", "enter", "--name", "vinci-free", "--", "unzip"]
         );
         let install = &plan[3].argv;
+        assert!(
+            install
+                .iter()
+                .any(|a| a.contains("apt-get update --error-on=any")),
+            "apt-get update exits 0 on fetch failures unless told otherwise"
+        );
         assert!(install.contains(&"ffmpeg".to_string()));
         assert!(!install.contains(&"rocm-opencl-runtime".to_string()));
         let run = &plan[5].argv;

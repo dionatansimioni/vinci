@@ -1,0 +1,40 @@
+name: Watchdog
+
+# Weekly check that everything the recipe depends on still exists (Blackmagic API,
+# distrobox script, vendor repos, packages on the base image, mirrors).
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  watchdog:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run checks
+        id: run
+        run: |
+          set -o pipefail
+          cargo run -q -p rli-core --example watchdog 2>&1 | tee report.txt
+      - name: Open an issue when something broke
+        if: failure() && steps.run.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title="Watchdog: a recipe dependency broke ($(date -u +%F))"
+          existing=$(gh issue list --state open --label watchdog --json number --jq '.[0].number')
+          body=$(printf 'The weekly watchdog failed.\n\n```\n%s\n```\n\nRun: %s/%s/actions/runs/%s\n' \
+            "$(cat report.txt)" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "$body"
+          else
+            gh label create watchdog --color B60205 --force >/dev/null
+            gh issue create --title "$title" --label watchdog --body "$body"
+          fi
