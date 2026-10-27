@@ -77,6 +77,8 @@ pub enum Msg {
     StartInstall(InstallerFile),
     OpenResolve,
     AskUninstall,
+    Preferences,
+    SettingsChanged,
     Restore,
     RemoveContainer(String),
     Repair(Repair),
@@ -125,7 +127,20 @@ pub struct Widgets {
 fn probe() -> (Report, Vec<Gpu>, Option<Distro>) {
     let sys = hardware::probe(&state::home());
     let gpus = sys.gpus.clone();
-    (hardware::check(&sys), gpus, Distro::detect().ok())
+    let mut report = hardware::check(&sys);
+    apply_gpu_choice(&mut report, &gpus);
+    (report, gpus, Distro::detect().ok())
+}
+
+/// Honours the GPU picked in Preferences when it is still present and usable.
+fn apply_gpu_choice(report: &mut Report, gpus: &[Gpu]) {
+    if let Some(g) = settings().choose_gpu(gpus) {
+        report.chosen_gpu = Some(g.clone());
+    }
+}
+
+fn settings() -> rli_core::settings::Settings {
+    rli_core::settings::Settings::load(&rli_core::settings::Settings::default_path())
 }
 
 fn downloads_dir() -> PathBuf {
@@ -412,6 +427,13 @@ impl Component for App {
             .policy(adw::ViewSwitcherPolicy::Wide)
             .build();
         let header = adw::HeaderBar::new();
+        let prefs = gtk::Button::from_icon_name("emblem-system-symbolic");
+        prefs.set_tooltip_text(Some(&tr("Preferences")));
+        prefs.connect_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(Msg::Preferences)
+        });
+        header.pack_end(&prefs);
         header.set_title_widget(Some(&switcher));
         let toolbar = adw::ToolbarView::new();
         toolbar.add_top_bar(&header);
@@ -513,6 +535,13 @@ impl Component for App {
             }
             Msg::StartInstall(file) => self.start_install(file, &sender),
             Msg::AskUninstall => self.ask_uninstall(&sender, root),
+            Msg::Preferences => {
+                let input = sender.input_sender().clone();
+                crate::preferences::present(root, &self.gpus, move || {
+                    input.emit(Msg::SettingsChanged)
+                });
+            }
+            Msg::SettingsChanged => apply_gpu_choice(&mut self.report, &self.gpus),
             Msg::RemoveContainer(name) => {
                 sender.spawn_command(move |_| {
                     let _ = HostRunner::new().run(&[
@@ -1111,8 +1140,8 @@ fn install_blocking(
         home: &home,
         data_home: &integrate::data_home(&home),
         state_path: &State::default_path(),
-        keep_installer: true,
-        keep_restore_point: true,
+        keep_installer: settings().keep_installer,
+        keep_restore_point: settings().keep_restore_point,
     };
     flow::install_resolve(&runner, &recipe, &req, &mut |e| {
         let _ = out.send(Cmd::Progress(e));

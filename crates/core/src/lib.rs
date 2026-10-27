@@ -20,6 +20,7 @@ pub mod known_bad;
 pub mod launcher;
 pub mod recipe;
 pub mod remote;
+pub mod settings;
 pub mod state;
 pub mod tools;
 pub mod uninstall;

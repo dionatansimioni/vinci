@@ -425,3 +425,66 @@ msgstr "Salvando um ponto de restauração da versão atual"
 
 msgid "The previous version is back."
 msgstr "A versão anterior foi restaurada."
+
+msgid "Allows reinstalling without downloading again (3–12 GB)."
+msgstr "Permite reinstalar sem baixar de novo (3–12 GB)."
+
+msgid "Applies to the menu entry the next time Vinci repairs or installs it."
+msgstr "Vale para o atalho na próxima vez que o Vinci o reparar ou instalar."
+
+msgid "Automatic"
+msgstr "Automática"
+
+msgid "Choose folder…"
+msgstr "Escolher pasta…"
+
+msgid "Convert in the background"
+msgstr "Converter em segundo plano"
+
+msgid "Export folder (convert renders to MP4)"
+msgstr "Pasta de exportação (converte renderizações para MP4)"
+
+msgid "Files placed in these folders are converted automatically."
+msgstr "Arquivos colocados nestas pastas são convertidos automaticamente."
+
+msgid "GPU for DaVinci Resolve"
+msgstr "GPU do DaVinci Resolve"
+
+msgid "General"
+msgstr "Geral"
+
+msgid "Import folder (convert for editing)"
+msgstr "Pasta de importação (converte para editar)"
+
+msgid "Keep a restore point"
+msgstr "Manter um ponto de restauração"
+
+msgid "Keep the installer"
+msgstr "Guardar o instalador"
+
+msgid "Keeps converting with Vinci closed, with an icon in the system tray."
+msgstr "Continua convertendo com o Vinci fechado, com um ícone na bandeja do sistema."
+
+msgid "Language"
+msgstr "Idioma"
+
+msgid "Off"
+msgstr "Desativada"
+
+msgid "Preferences"
+msgstr "Preferências"
+
+msgid "Saves the current version before each update so you can go back (5–10 GB)."
+msgstr "Salva a versão atual antes de cada atualização para você poder voltar (5–10 GB)."
+
+msgid "System language"
+msgstr "Idioma do sistema"
+
+msgid "Takes effect the next time Vinci opens."
+msgstr "Vale a partir da próxima vez que o Vinci abrir."
+
+msgid "Updates and disk space"
+msgstr "Atualizações e espaço em disco"
+
+msgid "Watch folders"
+msgstr "Pastas monitoradas"
