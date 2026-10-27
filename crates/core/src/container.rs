@@ -11,6 +11,8 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepKind {
     PullImage,
+    /// Saves the current container as the restore point before it is replaced.
+    Snapshot,
     /// Drops an earlier container with the same name (reinstall/update). Runs after the
     /// pull so a network failure never destroys a working install.
     RemoveExisting,
@@ -43,6 +45,8 @@ pub struct Target<'a> {
     pub installer: &'a Path,
     /// Scratch directory under `$HOME` where the zip is extracted.
     pub work_dir: &'a Path,
+    /// Keep the container being replaced as a restore point.
+    pub snapshot: bool,
 }
 
 pub fn container_name(recipe: &Recipe, edition: Edition) -> String {
@@ -89,6 +93,9 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
         argv: s(&["podman", "pull", &recipe.container.image]),
     }];
 
+    if t.snapshot {
+        steps.push(crate::backup::snapshot_step(&name));
+    }
     steps.push(Step {
         kind: StepKind::RemoveExisting,
         // --ignore: succeeds when there is nothing to remove.
@@ -244,6 +251,7 @@ mod tests {
             distrobox: "distrobox",
             installer,
             work_dir: Path::new("/home/u/.cache/vinci/work"),
+            snapshot: false,
         }
     }
 

@@ -62,6 +62,8 @@ pub struct App {
     installed: Option<rli_core::state::Installation>,
     update: Option<UpdateInfo>,
     problems: Vec<Problem>,
+    backup: Option<rli_core::state::Installation>,
+    restoring: bool,
 }
 
 #[derive(Debug)]
@@ -75,6 +77,7 @@ pub enum Msg {
     StartInstall(InstallerFile),
     OpenResolve,
     AskUninstall,
+    Restore,
     RemoveContainer(String),
     Repair(Repair),
     RunHealth,
@@ -95,12 +98,14 @@ pub enum Cmd {
     Update(UpdateInfo),
     Uninstalled(rli_core::uninstall::Summary),
     Health(Vec<Problem>),
+    Restored(Result<rli_core::state::Installation, String>),
 }
 
 pub struct Widgets {
     installed_group: adw::PreferencesGroup,
     installed_row: adw::ActionRow,
     problem_rows: Vec<adw::ActionRow>,
+    restore_row: adw::ActionRow,
     banner: adw::Banner,
     stack: gtk::Stack,
     status: adw::StatusPage,
@@ -255,6 +260,10 @@ impl Component for App {
                 .and_then(|s| s.installation),
             update: None,
             problems: Vec::new(),
+            backup: State::load(&State::default_path())
+                .ok()
+                .and_then(|s| s.backup),
+            restoring: false,
         };
         let input = |m: fn() -> Msg| {
             let sender = sender.clone();
@@ -279,6 +288,15 @@ impl Component for App {
         installed_row.add_suffix(&uninstall);
         installed_row.add_suffix(&open_installed);
         installed_group.add(&installed_row);
+        let restore_row = adw::ActionRow::builder()
+            .subtitle(tr("Restore point saved before the last update"))
+            .build();
+        restore_row.add_prefix(&gtk::Image::from_icon_name("edit-undo-symbolic"));
+        let restore = button(&tr("Go back to this version"), &[]);
+        restore.set_valign(gtk::Align::Center);
+        restore.connect_clicked(input(|| Msg::Restore));
+        restore_row.add_suffix(&restore);
+        installed_group.add(&restore_row);
         let recheck = button(&tr("Check again"), &["pill"]);
         recheck.connect_clicked(input(|| Msg::Recheck));
         let proceed = button(&tr("Continue"), &["suggested-action", "pill"]);
@@ -419,6 +437,7 @@ impl Component for App {
             installed_group,
             installed_row,
             problem_rows: Vec::new(),
+            restore_row,
             banner,
             stack,
             status,
@@ -503,6 +522,45 @@ impl Component for App {
                         "--ignore".into(),
                         name,
                     ]);
+                });
+            }
+            Msg::Restore => {
+                let Some(gpu) = self.chosen_gpu().cloned() else {
+                    return;
+                };
+                self.restoring = true;
+                let gpus = self.gpus.clone();
+                sender.spawn_command(move |out| {
+                    let runner = HostRunner::new();
+                    let home = state::home();
+                    let recipe = Recipe::bundled();
+                    let result = (|| {
+                        let dbx = tools::detect(&runner, &recipe, &home)
+                            .distrobox
+                            .executable()
+                            .ok_or_else(|| tr("distrobox is missing"))?;
+                        let inst = rli_core::backup::restore(
+                            &runner,
+                            &recipe,
+                            &dbx,
+                            gpu.vendor,
+                            &State::default_path(),
+                            &mut |_| {},
+                        )
+                        .map_err(|e| e.to_string())?;
+                        flow::write_launcher(
+                            &runner,
+                            &recipe,
+                            &dbx,
+                            &inst,
+                            &gpus,
+                            &gpu,
+                            &integrate::data_home(&home),
+                        )
+                        .map_err(|e| e.to_string())?;
+                        Ok(inst)
+                    })();
+                    let _ = out.send(Cmd::Restored(result));
                 });
             }
             Msg::RunHealth => {
@@ -631,6 +689,25 @@ impl Component for App {
             Cmd::HostReady => {}
             Cmd::Update(info) => self.update = Some(info),
             Cmd::Health(problems) => self.problems = problems,
+            Cmd::Restored(result) => {
+                self.restoring = false;
+                match result {
+                    Ok(inst) => {
+                        self.installed = Some(inst);
+                        self.backup = None;
+                        self.update = None;
+                        self.toasts
+                            .add_toast(adw::Toast::new(&tr("The previous version is back.")));
+                    }
+                    Err(e) => {
+                        self.toasts.add_toast(adw::Toast::new(&format!(
+                            "{} {e}",
+                            tr("Could not restore:")
+                        )));
+                    }
+                }
+                sender.input(Msg::RunHealth);
+            }
             Cmd::Uninstalled(summary) => {
                 self.installed = None;
                 self.outcome = None;
@@ -647,6 +724,9 @@ impl Component for App {
                 self.toasts.add_toast(adw::Toast::new(&text));
             }
             Cmd::Finished(Ok(outcome)) => {
+                self.backup = State::load(&State::default_path())
+                    .ok()
+                    .and_then(|s| s.backup);
                 if let Some(old) = &outcome.replaced {
                     self.offer_removing(old.clone(), &sender, root);
                 }
@@ -709,6 +789,15 @@ impl Component for App {
                 i.version
             ));
             w.installed_row.set_subtitle(&tr("Installed"));
+        }
+        w.restore_row.set_visible(self.backup.is_some());
+        w.restore_row.set_sensitive(!self.restoring);
+        if let Some(b) = &self.backup {
+            w.restore_row.set_title(&format!(
+                "{} {}",
+                messages::edition_name(b.edition),
+                b.version
+            ));
         }
         for row in w.problem_rows.drain(..) {
             w.installed_group.remove(&row);
@@ -1023,6 +1112,7 @@ fn install_blocking(
         data_home: &integrate::data_home(&home),
         state_path: &State::default_path(),
         keep_installer: true,
+        keep_restore_point: true,
     };
     flow::install_resolve(&runner, &recipe, &req, &mut |e| {
         let _ = out.send(Cmd::Progress(e));

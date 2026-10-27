@@ -36,6 +36,9 @@ pub struct State {
     /// The active Resolve install. Only one exists at a time.
     #[serde(default)]
     pub installation: Option<Installation>,
+    /// What the restore point (`backup::IMAGE`) contains, if one exists.
+    #[serde(default)]
+    pub backup: Option<Installation>,
     /// Studio dongle udev rule file we wrote, if any.
     #[serde(default)]
     pub udev_rule: Option<PathBuf>,

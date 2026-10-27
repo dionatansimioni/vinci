@@ -151,6 +151,7 @@ mod tests {
                 distrobox: "distrobox",
                 installer: Path::new("/h/DaVinci_Resolve_21.1.2_Linux.zip"),
                 work_dir: Path::new("/h/work"),
+                snapshot: false,
             },
         )
     }

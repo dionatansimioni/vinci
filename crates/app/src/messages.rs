@@ -85,6 +85,7 @@ pub fn installer_title(f: &InstallerFile) -> String {
 pub fn step(kind: StepKind) -> String {
     match kind {
         StepKind::PullImage => tr("Downloading the base system"),
+        StepKind::Snapshot => tr("Saving a restore point of the current version"),
         StepKind::RemoveExisting => tr("Removing the previous installation"),
         StepKind::Create => tr("Creating the container"),
         StepKind::Initialize => tr("Setting up the container"),

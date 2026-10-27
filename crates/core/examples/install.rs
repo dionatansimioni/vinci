@@ -49,6 +49,7 @@ fn main() {
             data_home: &integrate::data_home(&home),
             state_path: &state::State::default_path(),
             keep_installer: true,
+            keep_restore_point: true,
         },
         &mut |e| println!("{e:?}"),
     );

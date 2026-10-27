@@ -32,6 +32,7 @@ fn main() {
         distrobox,
         installer,
         work_dir: Path::new(work_dir),
+        snapshot: false,
     };
     for step in install_plan(&recipe, &target) {
         if skip.split(',').any(|s| s == format!("{:?}", step.kind)) {

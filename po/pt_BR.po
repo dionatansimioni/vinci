@@ -410,3 +410,18 @@ msgstr "Remover a instalação anterior?"
 
 msgid "{name} is still installed in its own container. Removing it frees disk space; your projects are not affected."
 msgstr "O {name} continua instalado no próprio container. Removê-lo libera espaço em disco; seus projetos não são afetados."
+
+msgid "Could not restore:"
+msgstr "Não foi possível restaurar:"
+
+msgid "Go back to this version"
+msgstr "Voltar a esta versão"
+
+msgid "Restore point saved before the last update"
+msgstr "Ponto de restauração salvo antes da última atualização"
+
+msgid "Saving a restore point of the current version"
+msgstr "Salvando um ponto de restauração da versão atual"
+
+msgid "The previous version is back."
+msgstr "A versão anterior foi restaurada."

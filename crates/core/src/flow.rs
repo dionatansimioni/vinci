@@ -33,6 +33,8 @@ pub struct Request<'a> {
     pub state_path: &'a Path,
     /// Keep a copy of the installer so Resolve can be reinstalled offline (SPEC §12.5).
     pub keep_installer: bool,
+    /// Save the container being replaced as a restore point (SPEC §12.4).
+    pub keep_restore_point: bool,
 }
 
 #[derive(Debug)]
@@ -117,6 +119,11 @@ pub fn install_resolve(
     let edition = req.installer.edition;
     let name = container::container_name(recipe, edition);
     let work = work_dir(req.home);
+    let previous = State::load(req.state_path)
+        .map_err(Error::State)?
+        .installation
+        .filter(|i| i.container == name);
+    let snapshot = req.keep_restore_point && previous.is_some();
     let steps = container::install_plan(
         recipe,
         &Target {
@@ -125,6 +132,7 @@ pub fn install_resolve(
             distrobox: req.distrobox,
             installer: &req.installer.path,
             work_dir: &work,
+            snapshot,
         },
     );
     let ctx = Context {
@@ -159,6 +167,9 @@ pub fn install_resolve(
     }
 
     let mut state = State::load(req.state_path).map_err(Error::State)?;
+    if snapshot {
+        state.backup = previous;
+    }
     let replaced = state
         .installation
         .replace(installation.clone())
@@ -229,6 +240,7 @@ mod tests {
                 data_home: &self.home.join(".local/share"),
                 state_path: &self.home.join("state.json"),
                 keep_installer: true,
+                keep_restore_point: true,
             };
             install_resolve(runner, &Recipe::bundled(), &req, &mut |_| {})
         }
@@ -313,6 +325,32 @@ mod tests {
         assert!(std::fs::read_to_string(desktop)
             .unwrap()
             .contains("--name vinci-free"));
+    }
+
+    #[test]
+    fn update_keeps_a_restore_point_of_the_previous_version() {
+        let env = Env::new("restore", Edition::Free);
+        env.run(&ok_runner()).unwrap();
+        let first = State::load(&env.home.join("state.json")).unwrap();
+        assert!(first.backup.is_none(), "nothing to keep on a first install");
+
+        let runner = ok_runner();
+        env.run(&runner).unwrap();
+        let st = State::load(&env.home.join("state.json")).unwrap();
+        assert_eq!(st.backup.unwrap().container, "vinci-free");
+        let calls = runner.calls();
+        let snap = calls
+            .iter()
+            .position(|c| c.iter().any(|a| a.contains("container commit")))
+            .unwrap();
+        let rm = calls
+            .iter()
+            .position(|c| c.starts_with(&["podman".into(), "rm".into()]))
+            .unwrap();
+        assert!(
+            snap < rm,
+            "snapshot is taken before the old container is removed"
+        );
     }
 
     #[test]

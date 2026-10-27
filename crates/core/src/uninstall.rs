@@ -101,7 +101,7 @@ pub fn uninstall(
         "rm",
         "--force",
         "--ignore",
-        "vinci-backup",
+        crate::backup::IMAGE,
     ]));
 
     if let Err(e) = integrate::remove(runner, data_home) {
