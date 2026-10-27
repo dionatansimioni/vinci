@@ -104,6 +104,70 @@ pub fn run_streaming(
     Ok((ok, err_thread.join().unwrap_or_default()))
 }
 
+/// Where and how to run ffmpeg: inside a container, or directly (tests, CI).
+#[derive(Debug, Clone)]
+pub enum Engine {
+    Container {
+        distrobox: String,
+        container: String,
+    },
+    Direct,
+}
+
+impl Engine {
+    fn wrap(&self, argv: &[String]) -> Vec<String> {
+        match self {
+            Self::Container {
+                distrobox,
+                container,
+            } => in_container(distrobox, container, argv),
+            Self::Direct => argv.to_vec(),
+        }
+    }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ConvertError {
+    #[error("could not start ffmpeg: {0}")]
+    Spawn(#[from] std::io::Error),
+    #[error("ffmpeg failed")]
+    Failed { stderr: String },
+    #[error("ffmpeg reported success but produced no file")]
+    NoOutput,
+}
+
+/// Converts one file: probes its length, runs ffmpeg with live progress (0..=1 when the
+/// length is known), and checks the output really exists before reporting success.
+pub fn convert_file(
+    engine: &Engine,
+    command: (Vec<String>, PathBuf),
+    input: &Path,
+    mut on_progress: impl FnMut(Option<f64>),
+) -> Result<PathBuf, ConvertError> {
+    let total = crate::host::HostRunner::new()
+        .run_plain(&engine.wrap(&duration_command(input)))
+        .ok()
+        .and_then(|o| parse_duration(&o));
+    let (argv, out) = command;
+    let mode = crate::host::ExecMode::detect();
+    let (ok, stderr) = run_streaming(
+        &mode.wrap(&engine.wrap(&argv)),
+        |line| match parse_progress(line) {
+            Some(Progress::At(t)) => on_progress(fraction(t, total)),
+            Some(Progress::End) => on_progress(Some(1.0)),
+            None => {}
+        },
+    )?;
+    if !ok {
+        return Err(ConvertError::Failed { stderr });
+    }
+    // ffmpeg can exit 0 without writing (e.g. -n on an existing file); trust the disk.
+    if !out.exists() {
+        return Err(ConvertError::NoOutput);
+    }
+    Ok(out)
+}
+
 /// Files in a watch folder that are ready to convert: media, not already handled, and
 /// unchanged for `settle` (so we don't grab a file that is still being copied).
 pub fn pending(
@@ -206,6 +270,59 @@ mod tests {
         assert!(!ok);
         assert_eq!(lines, ["a", "b"]);
         assert_eq!(err, "oops");
+    }
+
+    /// Real conversion with progress, using ffmpeg on PATH (run inside the container or
+    /// CI image with `--ignored`).
+    #[test]
+    #[ignore]
+    fn real_convert_with_progress() {
+        use crate::ffmpeg::{import_command, ImportPreset};
+        let dir = std::env::temp_dir().join(format!("rli-conv-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("clip.mp4");
+        let made = Command::new("ffmpeg")
+            .args([
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=1280x720:rate=30:duration=4",
+            ])
+            .args([
+                "-f",
+                "lavfi",
+                "-i",
+                "sine=duration=4",
+                "-c:v",
+                "libx264",
+                "-c:a",
+                "aac",
+                "-shortest",
+            ])
+            .arg(&src)
+            .status()
+            .unwrap()
+            .success();
+        assert!(made);
+        let mut seen = Vec::new();
+        let out = convert_file(
+            &Engine::Direct,
+            import_command(&src, &dir, ImportPreset::DnxhrHq),
+            &src,
+            |f| seen.push(f),
+        )
+        .unwrap();
+        let exists = out.exists();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(exists);
+        assert_eq!(seen.last(), Some(&Some(1.0)));
+        assert!(
+            seen.iter().flatten().any(|f| *f > 0.0 && *f < 1.0),
+            "intermediate progress: {seen:?}"
+        );
     }
 
     #[test]

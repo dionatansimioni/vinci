@@ -74,6 +74,17 @@ impl HostRunner {
         exec(&self.mode.wrap_root(argv))
     }
 
+    /// Runs an argv that is already complete (no Flatpak wrapping) and returns stdout
+    /// when it succeeds.
+    pub fn run_plain(&self, argv: &[String]) -> std::io::Result<String> {
+        let out = exec(&self.mode.wrap(argv))?;
+        if out.success {
+            Ok(out.stdout)
+        } else {
+            Err(std::io::Error::other(out.stderr))
+        }
+    }
+
     /// Starts a long-lived program (e.g. Resolve) without waiting for it.
     pub fn spawn_detached(&self, argv: &[String]) -> std::io::Result<()> {
         let argv = self.mode.wrap(argv);
