@@ -341,3 +341,33 @@ msgstr "Vídeo e áudio"
 
 msgid "Waiting"
 msgstr "Aguardando"
+
+msgid "Also delete projects and the Resolve database"
+msgstr "Apagar também projetos e o banco de dados do Resolve"
+
+msgid "Also remove"
+msgstr "Remover também o"
+
+msgid "DaVinci Resolve was uninstalled."
+msgstr "O DaVinci Resolve foi desinstalado."
+
+msgid "Installed"
+msgstr "Instalado"
+
+msgid "Open"
+msgstr "Abrir"
+
+msgid "The container and menu entry are removed. Your projects stay unless you tick the option below."
+msgstr "O container e o atalho no menu serão removidos. Seus projetos ficam, a menos que você marque a opção abaixo."
+
+msgid "Uninstall"
+msgstr "Desinstalar"
+
+msgid "Uninstall DaVinci Resolve?"
+msgstr "Desinstalar o DaVinci Resolve?"
+
+msgid "Uninstalled, with warnings:"
+msgstr "Desinstalado, com avisos:"
+
+msgid "Uninstall…"
+msgstr "Desinstalar…"

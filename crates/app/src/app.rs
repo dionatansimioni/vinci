@@ -72,6 +72,11 @@ pub enum Msg {
     Install(usize),
     StartInstall(InstallerFile),
     OpenResolve,
+    AskUninstall,
+    Uninstall {
+        delete_projects: bool,
+        tools: Vec<String>,
+    },
     CopyReport,
     Back,
 }
@@ -83,9 +88,12 @@ pub enum Cmd {
     HostReady,
     Finished(Result<Outcome, (String, String)>),
     Update(UpdateInfo),
+    Uninstalled(rli_core::uninstall::Summary),
 }
 
 pub struct Widgets {
+    installed_group: adw::PreferencesGroup,
+    installed_row: adw::ActionRow,
     banner: adw::Banner,
     stack: gtk::Stack,
     status: adw::StatusPage,
@@ -251,6 +259,18 @@ impl Component for App {
             .title(tr("System check"))
             .build();
         let check_group = adw::PreferencesGroup::new();
+        let installed_group = adw::PreferencesGroup::builder().margin_bottom(24).build();
+        let installed_row = adw::ActionRow::new();
+        installed_row.add_prefix(&gtk::Image::from_icon_name("emblem-ok-symbolic"));
+        let open_installed = button(&tr("Open"), &["suggested-action"]);
+        open_installed.set_valign(gtk::Align::Center);
+        open_installed.connect_clicked(input(|| Msg::OpenResolve));
+        let uninstall = button(&tr("Uninstall…"), &["destructive-action"]);
+        uninstall.set_valign(gtk::Align::Center);
+        uninstall.connect_clicked(input(|| Msg::AskUninstall));
+        installed_row.add_suffix(&uninstall);
+        installed_row.add_suffix(&open_installed);
+        installed_group.add(&installed_row);
         let recheck = button(&tr("Check again"), &["pill"]);
         recheck.connect_clicked(input(|| Msg::Recheck));
         let proceed = button(&tr("Continue"), &["suggested-action", "pill"]);
@@ -259,6 +279,7 @@ impl Component for App {
         report_check.connect_clicked(input(|| Msg::CopyReport));
         let check_page = page_box(&[
             status.upcast_ref(),
+            installed_group.upcast_ref(),
             check_group.upcast_ref(),
             button_row(&[&recheck, &proceed]).upcast_ref(),
             button_row(&[&report_check]).upcast_ref(),
@@ -386,6 +407,8 @@ impl Component for App {
             });
         }
         let mut widgets = Widgets {
+            installed_group,
+            installed_row,
             banner,
             stack,
             status,
@@ -460,6 +483,33 @@ impl Component for App {
                 }
             }
             Msg::StartInstall(file) => self.start_install(file, &sender),
+            Msg::AskUninstall => self.ask_uninstall(&sender, root),
+            Msg::Uninstall {
+                delete_projects,
+                tools,
+            } => {
+                let distro = self.distro.clone().unwrap_or_else(|| Distro::parse(""));
+                sender.spawn_command(move |out| {
+                    let runner = HostRunner::new();
+                    let home = state::home();
+                    let summary = rli_core::uninstall::uninstall(
+                        &runner,
+                        &|argv: &[String]| runner.run_root(argv).is_ok_and(|o| o.success),
+                        &Recipe::bundled(),
+                        &distro,
+                        &rli_core::uninstall::Locations {
+                            home: &home,
+                            data_home: &integrate::data_home(&home),
+                            state_path: &State::default_path(),
+                        },
+                        &rli_core::uninstall::Options {
+                            delete_projects,
+                            remove_tools: tools,
+                        },
+                    );
+                    let _ = out.send(Cmd::Uninstalled(summary));
+                });
+            }
             Msg::CopyReport => {
                 root.clipboard().set_text(&self.diagnostic_report());
                 self.toasts.add_toast(adw::Toast::new(&tr(
@@ -467,14 +517,18 @@ impl Component for App {
                 )));
             }
             Msg::OpenResolve => {
-                if let (Some(o), Some(g)) = (&self.outcome, self.chosen_gpu()) {
+                let container = self
+                    .outcome
+                    .as_ref()
+                    .map(|o| o.installation.container.clone())
+                    .or_else(|| self.installed.as_ref().map(|i| i.container.clone()));
+                if let (Some(container), Some(g)) = (container, self.chosen_gpu()) {
                     let recipe = Recipe::bundled();
                     let runner = HostRunner::new();
                     let tools = tools::detect(&runner, &recipe, &state::home());
                     if let Some(dbx) = tools.distrobox.executable() {
                         let env = launcher::environment(&recipe, &self.gpus, g);
-                        let argv =
-                            launcher::command(&recipe, &dbx, &o.installation.container, &env);
+                        let argv = launcher::command(&recipe, &dbx, &container, &env);
                         let _ = runner.spawn_detached(&argv);
                     }
                 }
@@ -500,7 +554,23 @@ impl Component for App {
             Cmd::Progress(Event::Finished { .. }) => self.progress.0 += 1,
             Cmd::HostReady => {}
             Cmd::Update(info) => self.update = Some(info),
+            Cmd::Uninstalled(summary) => {
+                self.installed = None;
+                self.outcome = None;
+                self.update = None;
+                let text = if summary.warnings.is_empty() {
+                    tr("DaVinci Resolve was uninstalled.")
+                } else {
+                    format!(
+                        "{} {}",
+                        tr("Uninstalled, with warnings:"),
+                        summary.warnings.join(", ")
+                    )
+                };
+                self.toasts.add_toast(adw::Toast::new(&text));
+            }
             Cmd::Finished(Ok(outcome)) => {
+                self.installed = Some(outcome.installation.clone());
                 self.outcome = Some(outcome);
                 self.page = Page::Done;
             }
@@ -552,6 +622,15 @@ impl Component for App {
             .chosen_gpu()
             .map_or_else(|| tr("no compatible GPU"), messages::gpu_label);
         w.status.set_description(Some(&format!("{distro} · {gpu}")));
+        w.installed_group.set_visible(self.installed.is_some());
+        if let Some(i) = &self.installed {
+            w.installed_row.set_title(&format!(
+                "{} {}",
+                messages::edition_name(i.edition),
+                i.version
+            ));
+            w.installed_row.set_subtitle(&tr("Installed"));
+        }
         for row in w.check_rows.drain(..) {
             w.check_group.remove(&row);
         }
@@ -645,6 +724,51 @@ impl App {
             error: self.error.as_ref().map(|(a, b)| (a.as_str(), b.as_str())),
             home: &home,
         })
+    }
+
+    /// Confirms the uninstall. Deleting projects is opt-in (unticked) per SPEC §7, and
+    /// only tools Vinci itself installed are offered.
+    fn ask_uninstall(&self, sender: &ComponentSender<Self>, root: &adw::ApplicationWindow) {
+        let recipe = Recipe::bundled();
+        let runner = HostRunner::new();
+        let st = State::load(&State::default_path()).unwrap_or_default();
+        let tools = rli_core::uninstall::removable_tools(&st, &runner, &recipe);
+
+        let boxed = gtk::Box::new(gtk::Orientation::Vertical, 6);
+        let projects =
+            gtk::CheckButton::with_label(&tr("Also delete projects and the Resolve database"));
+        boxed.append(&projects);
+        let tool_checks: Vec<(String, gtk::CheckButton)> = tools
+            .iter()
+            .map(|t| {
+                let c = gtk::CheckButton::with_label(&format!("{} {}", tr("Also remove"), t.name));
+                boxed.append(&c);
+                (t.name.clone(), c)
+            })
+            .collect();
+        let dialog = adw::AlertDialog::new(
+            Some(&tr("Uninstall DaVinci Resolve?")),
+            Some(&tr("The container and menu entry are removed. Your projects stay unless you tick the option below.")),
+        );
+        dialog.set_extra_child(Some(&boxed));
+        dialog.add_response("cancel", &tr("Cancel"));
+        dialog.add_response("uninstall", &tr("Uninstall"));
+        dialog.set_response_appearance("uninstall", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("cancel"));
+        let sender = sender.clone();
+        dialog.connect_response(None, move |_, response| {
+            if response == "uninstall" {
+                sender.input(Msg::Uninstall {
+                    delete_projects: projects.is_active(),
+                    tools: tool_checks
+                        .iter()
+                        .filter(|(_, c)| c.is_active())
+                        .map(|(n, _)| n.clone())
+                        .collect(),
+                });
+            }
+        });
+        dialog.present(Some(root));
     }
 
     /// Shows what will be installed on the host and asks first (SPEC §3); skips straight
