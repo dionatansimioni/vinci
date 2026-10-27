@@ -5,6 +5,7 @@ pub mod blackmagic;
 pub mod container;
 pub mod distro;
 pub mod ffmpeg;
+pub mod flow;
 pub mod gpu;
 pub mod hardware;
 pub mod host;
