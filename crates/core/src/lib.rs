@@ -7,5 +7,6 @@ pub mod hardware;
 pub mod host;
 pub mod installer_file;
 pub mod known_bad;
+pub mod recipe;
 pub mod state;
 pub mod version;

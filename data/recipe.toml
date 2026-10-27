@@ -1,0 +1,97 @@
+# Vinci recipe: everything about the outside world that changes over time.
+#
+# The app embeds this file and may fetch a newer signed copy from GitHub.
+# Purely declarative: no shell snippets, and every field is validated before use.
+# Bump `revision` on every change; bump `schema` only when the format changes.
+
+schema = 1
+revision = 1
+
+[container]
+image = "docker.io/library/ubuntu:24.04"
+mirrors = ["public.ecr.aws/ubuntu/ubuntu:24.04"]
+name_prefix = "vinci"
+
+[distrobox]
+# Host copies inside [min_host, max_host) are used as-is; otherwise we install `pinned`.
+pinned = "1.8.2.5"
+min_host = "1.8.0"
+max_host = "2.0.0"
+install_url = "https://raw.githubusercontent.com/89luca89/distrobox/1.8.2.5/install"
+
+[packages]
+# Runtime libraries DaVinci Resolve links against on Ubuntu 24.04, plus our tools.
+base = [
+    "ca-certificates",
+    "curl",
+    "unzip",
+    "xdg-utils",
+    "ffmpeg",
+    "clinfo",
+    "ocl-icd-libopencl1",
+    "libapr1t64",
+    "libaprutil1t64",
+    "libasound2t64",
+    "libglib2.0-0t64",
+    "libgl1",
+    "libglu1-mesa",
+    "libegl1",
+    "libfuse2t64",
+    "libdbus-1-3",
+    "libxcb-cursor0",
+    "libxcb-icccm4",
+    "libxcb-image0",
+    "libxcb-keysyms1",
+    "libxcb-randr0",
+    "libxcb-render-util0",
+    "libxcb-shape0",
+    "libxcb-xinerama0",
+    "libxcb-xkb1",
+    "libxkbcommon-x11-0",
+    "libxrandr2",
+    "libxinerama1",
+    "libxcursor1",
+    "libxi6",
+    "libxtst6",
+]
+
+[gpu.nvidia]
+# The host driver's userspace is mounted by `distrobox create --nvidia`.
+packages = []
+
+[gpu.amd]
+packages = ["rocm-opencl-runtime"]
+
+[gpu.amd.apt_repo]
+name = "rocm"
+key_url = "https://repo.radeon.com/rocm/rocm.gpg.key"
+url = "https://repo.radeon.com/rocm/apt/7.2.4"
+suite = "noble"
+components = ["main"]
+
+[gpu.intel]
+experimental = true
+packages = ["intel-opencl-icd"]
+
+[resolve]
+install_dir = "/opt/resolve"
+# Bundled libraries that clash with the system ones on Ubuntu (paths relative to install_dir).
+remove_libs = [
+    "libs/libglib-2.0.so*",
+    "libs/libgio-2.0.so*",
+    "libs/libgmodule-2.0.so*",
+]
+
+[resolve.installer_env]
+SKIP_PACKAGE_CHECK = "1"
+
+[launcher]
+mime_types = ["application/x-resolveproj", "application/x-resolvetimeline"]
+
+[launcher.env]
+QT_QPA_PLATFORM = "xcb"
+
+[blackmagic]
+latest_free = "https://www.blackmagicdesign.com/api/support/latest-stable-version/davinci-resolve/linux"
+latest_studio = "https://www.blackmagicdesign.com/api/support/latest-stable-version/davinci-resolve-studio/linux"
+download_page = "https://www.blackmagicdesign.com/support/family/davinci-resolve-and-fusion"
