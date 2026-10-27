@@ -59,11 +59,18 @@ fn s(parts: &[&str]) -> Vec<String> {
     parts.iter().map(|p| p.to_string()).collect()
 }
 
-/// Wraps a command to run as root inside the container.
-fn in_box(t: &Target, name: &str, cmd: Vec<String>) -> Vec<String> {
-    let mut argv = s(&[t.distrobox, "enter", "--name", name, "--", "sudo"]);
+/// Wraps a command to run as the user inside the container.
+fn in_box_user(t: &Target, name: &str, cmd: Vec<String>) -> Vec<String> {
+    let mut argv = s(&[t.distrobox, "enter", "--name", name, "--"]);
     argv.extend(cmd);
     argv
+}
+
+/// Wraps a command to run as root inside the container.
+fn in_box(t: &Target, name: &str, cmd: Vec<String>) -> Vec<String> {
+    let mut sudo = vec!["sudo".to_string()];
+    sudo.extend(cmd);
+    in_box_user(t, name, sudo)
 }
 
 /// Full install plan, in order.
@@ -137,13 +144,18 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
     let run_file = if t.installer.extension().is_some_and(|e| e == "zip") {
         steps.push(Step {
             kind: StepKind::ExtractInstaller,
-            argv: s(&[
-                "unzip",
-                "-o",
-                &t.installer.to_string_lossy(),
-                "-d",
-                &t.work_dir.to_string_lossy(),
-            ]),
+            // Inside the box: the host may lack unzip (or be a Flatpak sandbox).
+            argv: in_box_user(
+                t,
+                &name,
+                s(&[
+                    "unzip",
+                    "-o",
+                    &t.installer.to_string_lossy(),
+                    "-d",
+                    &t.work_dir.to_string_lossy(),
+                ]),
+            ),
         });
         let stem = t
             .installer
@@ -240,6 +252,10 @@ mod tests {
             ]
         );
         assert!(plan[1].argv.contains(&"--nvidia".to_string()));
+        assert_eq!(
+            &plan[3].argv[..6],
+            ["distrobox", "enter", "--name", "vinci-free", "--", "unzip"]
+        );
         let install = &plan[2].argv;
         assert!(install.contains(&"ffmpeg".to_string()));
         assert!(!install.contains(&"rocm-opencl-runtime".to_string()));
