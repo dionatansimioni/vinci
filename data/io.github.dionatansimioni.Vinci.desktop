@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=Vinci
+GenericName=DaVinci Resolve Installer
+GenericName[pt_BR]=Instalador do DaVinci Resolve
+Comment=Install and run DaVinci Resolve on any Linux distribution (unofficial)
+Comment[pt_BR]=Instale e use o DaVinci Resolve em qualquer distribuição Linux (não oficial)
+Exec=vinci
+Icon=io.github.dionatansimioni.Vinci
+Terminal=false
+Categories=AudioVideo;Video;
+Keywords=davinci;resolve;video;editor;installer;codec;convert;
+StartupNotify=true

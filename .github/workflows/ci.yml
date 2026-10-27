@@ -13,7 +13,7 @@ jobs:
       - name: Install GTK and test tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libgtk-4-dev libadwaita-1-dev desktop-file-utils
+          sudo apt-get install -y --no-install-recommends libgtk-4-dev libadwaita-1-dev desktop-file-utils appstream gettext
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt

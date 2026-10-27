@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.dionatansimioni.Vinci</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Vinci</name>
+  <summary>Unofficial DaVinci Resolve installer for any distribution</summary>
+  <summary xml:lang="pt-BR">Instalador não oficial do DaVinci Resolve para qualquer distribuição</summary>
+  <developer id="io.github.dionatansimioni">
+    <name>Dionatan Simioni</name>
+  </developer>
+  <description>
+    <p>
+      Vinci installs DaVinci Resolve in an isolated Ubuntu container with direct access to
+      your GPU, so it works the same on any Linux distribution without changing your system
+      libraries. It checks your hardware first, finds the official installer you downloaded
+      from Blackmagic Design, creates the menu entry, and helps with the video and audio
+      formats Resolve can't open on Linux.
+    </p>
+    <p>
+      Vinci is an unofficial project and is not affiliated with Blackmagic Design.
+      DaVinci Resolve is a trademark of Blackmagic Design Pty Ltd. Vinci does not include or
+      redistribute DaVinci Resolve, and collects no data.
+    </p>
+    <p xml:lang="pt-BR">
+      O Vinci instala o DaVinci Resolve num container Ubuntu isolado com acesso direto à sua
+      GPU, então ele funciona igual em qualquer distribuição Linux sem mexer nas bibliotecas
+      do sistema. Ele verifica o hardware, encontra o instalador oficial baixado do site da
+      Blackmagic Design, cria o atalho no menu e ajuda com os formatos de vídeo e áudio que o
+      Resolve não abre no Linux.
+    </p>
+    <p xml:lang="pt-BR">
+      O Vinci é um projeto não oficial, sem afiliação com a Blackmagic Design. DaVinci Resolve
+      é marca registrada da Blackmagic Design Pty Ltd. O Vinci não inclui nem redistribui o
+      DaVinci Resolve e não coleta nenhum dado.
+    </p>
+  </description>
+  <launchable type="desktop-id">io.github.dionatansimioni.Vinci.desktop</launchable>
+  <url type="homepage">https://github.com/dionatansimioni/vinci</url>
+  <url type="bugtracker">https://github.com/dionatansimioni/vinci/issues</url>
+  <url type="vcs-browser">https://github.com/dionatansimioni/vinci</url>
+  <content_rating type="oars-1.1"/>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+  </supports>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <releases>
+    <release version="0.1.0" date="2026-10-27">
+      <description>
+        <p>First development version.</p>
+      </description>
+    </release>
+  </releases>
+</component>
