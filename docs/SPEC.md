@@ -30,7 +30,7 @@ Este documento registra as decisões de design tomadas antes da implementação.
 - Imutáveis (Silverblue, Kinoite, Bazzite, SteamOS…): detectar; usar o que já existe; se faltar, `rpm-ostree install` + aviso de reboot.
 - Distro desconhecida: mostrar o comando manual.
 - **podman** via gerenciador de pacotes + `pkexec` (após confirmação).
-- **distrobox** instalado em `~/.local` sem root.
+- **distrobox**: ver §12.6 (versão fixa em prefixo privado, sem root).
 - Registro (state file) do que o app instalou. Desinstalação oferece remover só isso; verifica outros containers antes de remover o podman.
 - Driver de GPU no host: detectar e orientar; **não** instalar automaticamente.
 
@@ -93,3 +93,18 @@ Este documento registra as decisões de design tomadas antes da implementação.
 ## 11. Fatos a verificar
 
 Ver [FACTS.md](FACTS.md). Pontos que contradizem decisões estão em revisão com o autor.
+
+## 12. Durabilidade ("funcionar para sempre")
+
+Princípio: separar o que muda (dados) do que não muda (código), detectar quebras antes do usuário e sempre ter um caminho de volta.
+
+1. **Receitas declarativas** (TOML versionado): imagem/tag/espelhos, pacotes, libs a remover, variáveis de ambiente, repositórios ROCm/NEO, URLs da Blackmagic, versão fixada do distrobox. Adaptar o app = editar dados.
+2. **Receitas remotas** baixadas do GitHub entre releases: só declarativas (sem scripts), **assinadas com minisign** (chave pública embutida), com fallback para a receita embutida.
+3. **Migração de base**: quando a receita apontar uma base nova, fluxo igual ao Free→Studio (container novo, validar, oferecer remover o antigo).
+4. **Ponto de restauração**: `podman commit` antes de atualizar/migrar; botão "Voltar à versão anterior"; guarda só o último; desligável.
+5. **Cópia do instalador**: guarda o último zip que funcionou em `~/.local/share/vinci/installers`; desligável.
+6. **distrobox fixado**: usa o do host se for 1.8.x compatível; senão instala versão fixa em prefixo privado `~/.local/share/vinci/distrobox` (fora do PATH).
+7. **Imagem**: `docker.io/library/ubuntu:24.04`, registrando o digest usado; espelhos alternativos na receita.
+8. **Autodiagnóstico** a cada abertura (container, lançador, GPU dentro do container, driver do host) com botão "Reparar".
+9. **Offline-first**: toda dependência externa é opcional; nada já instalado deixa de funcionar se GitHub ou Blackmagic mudarem.
+10. **Vigia semanal no CI**: monta o container pela receita, confere pacotes, API da Blackmagic e repositórios; abre issue se quebrar.
