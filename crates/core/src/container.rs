@@ -11,6 +11,9 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepKind {
     PullImage,
+    /// Drops an earlier container with the same name (reinstall/update). Runs after the
+    /// pull so a network failure never destroys a working install.
+    RemoveExisting,
     Create,
     /// First entry runs distrobox's init (users, sudo); wait for it before using sudo.
     Initialize,
@@ -85,6 +88,12 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
         kind: StepKind::PullImage,
         argv: s(&["podman", "pull", &recipe.container.image]),
     }];
+
+    steps.push(Step {
+        kind: StepKind::RemoveExisting,
+        // --ignore: succeeds when there is nothing to remove.
+        argv: s(&["podman", "rm", "--force", "--ignore", &name]),
+    });
 
     let mut create = s(&[
         t.distrobox,
@@ -236,6 +245,14 @@ mod tests {
         }
     }
 
+    fn argv_of(steps: &[Step], kind: StepKind) -> &[String] {
+        &steps
+            .iter()
+            .find(|s| s.kind == kind)
+            .unwrap_or_else(|| panic!("no {kind:?} step"))
+            .argv
+    }
+
     fn kinds(steps: &[Step]) -> Vec<StepKind> {
         steps.iter().map(|s| s.kind).collect()
     }
@@ -261,6 +278,7 @@ mod tests {
             kinds(&plan),
             [
                 PullImage,
+                RemoveExisting,
                 Create,
                 Initialize,
                 InstallPackages,
@@ -270,17 +288,21 @@ mod tests {
                 RemoveConflictingLibs
             ]
         );
-        assert!(plan[1].argv.contains(&"--nvidia".to_string()));
         assert_eq!(
-            &plan[2].argv[5..],
+            argv_of(&plan, RemoveExisting),
+            ["podman", "rm", "--force", "--ignore", "vinci-free"]
+        );
+        assert!(argv_of(&plan, Create).contains(&"--nvidia".to_string()));
+        assert_eq!(
+            &argv_of(&plan, Initialize)[5..],
             ["sudo", "-n", "true"],
             "waits for distrobox init before any sudo step"
         );
         assert_eq!(
-            &plan[4].argv[..6],
+            &argv_of(&plan, ExtractInstaller)[..6],
             ["distrobox", "enter", "--name", "vinci-free", "--", "unzip"]
         );
-        let install = &plan[3].argv;
+        let install = argv_of(&plan, InstallPackages);
         assert!(
             install
                 .iter()
@@ -289,11 +311,11 @@ mod tests {
         );
         assert!(install.contains(&"ffmpeg".to_string()));
         assert!(!install.contains(&"rocm-opencl-runtime".to_string()));
-        let run = &plan[5].argv;
+        let run = argv_of(&plan, InstallResolve);
         assert!(run.contains(&"SKIP_PACKAGE_CHECK=1".to_string()));
         assert!(run.ends_with(&["-i".into(), "-y".into(), "-a".into()]));
         assert_eq!(
-            &plan[6].argv[5..],
+            &argv_of(&plan, Verify)[5..],
             ["test", "-x", "/opt/resolve/bin/resolve"]
         );
         assert!(
@@ -306,12 +328,13 @@ mod tests {
         let r = Recipe::bundled();
         let zip = zip();
         let plan = install_plan(&r, &target(Vendor::Amd, &zip));
-        assert!(!plan[1].argv.contains(&"--nvidia".to_string()));
-        assert_eq!(plan[3].kind, StepKind::AddRepository);
-        let repo = &plan[3].argv;
+        assert!(!argv_of(&plan, StepKind::Create).contains(&"--nvidia".to_string()));
+        let repo = argv_of(&plan, StepKind::AddRepository);
         assert!(repo.contains(&"https://repo.radeon.com/rocm/rocm.gpg.key".to_string()));
         assert!(repo.contains(&"rocm".to_string()));
-        assert!(plan[4].argv.contains(&"rocm-opencl-runtime".to_string()));
+        assert!(
+            argv_of(&plan, StepKind::InstallPackages).contains(&"rocm-opencl-runtime".to_string())
+        );
     }
 
     #[test]
