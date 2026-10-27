@@ -27,8 +27,9 @@ pub fn parse_distrobox_version(out: &str) -> Option<Version> {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DistroboxChoice {
-    /// A compatible distrobox is on the host PATH.
-    Host { version: Version },
+    /// A compatible distrobox is on the host PATH, at `path` (absolute, so menu entries
+    /// keep working in sessions with a different PATH).
+    Host { version: Version, path: String },
     /// Our pinned copy is already installed.
     Private { path: PathBuf },
     /// Neither: install the pinned version into the private prefix.
@@ -39,7 +40,7 @@ impl DistroboxChoice {
     /// The executable to call, if one is available.
     pub fn executable(&self) -> Option<String> {
         match self {
-            Self::Host { .. } => Some("distrobox".into()),
+            Self::Host { path, .. } => Some(path.clone()),
             Self::Private { path } => Some(path.to_string_lossy().into_owned()),
             Self::Install => None,
         }
@@ -65,8 +66,16 @@ pub fn detect(runner: &dyn Runner, recipe: &Recipe, home: &Path) -> HostTools {
         .filter(|o| o.success)
         .and_then(|o| parse_distrobox_version(&o.stdout));
     let private_bin = private_prefix(home).join("bin/distrobox");
-    let distrobox = match host_version {
-        Some(v) if recipe.distrobox.host_compatible(&v) => DistroboxChoice::Host { version: v },
+    let host_path = runner
+        .run(&argv(&["sh", "-c", "command -v distrobox"]))
+        .ok()
+        .filter(|o| o.success)
+        .map(|o| o.stdout.trim().to_string())
+        .filter(|p| p.starts_with('/'));
+    let distrobox = match (host_version, host_path) {
+        (Some(v), Some(path)) if recipe.distrobox.host_compatible(&v) => {
+            DistroboxChoice::Host { version: v, path }
+        }
         _ if private_bin.exists() => DistroboxChoice::Private { path: private_bin },
         _ => DistroboxChoice::Install,
     };
@@ -150,10 +159,19 @@ mod tests {
     fn uses_compatible_host_distrobox() {
         let r = FakeRunner::default()
             .respond(&["podman", "--version"], "podman version 5.7.0", true)
-            .respond(&["distrobox", "version"], "distrobox: 1.8.1", true);
+            .respond(&["distrobox", "version"], "distrobox: 1.8.1", true)
+            .respond(
+                &["sh", "-c", "command -v distrobox"],
+                "/usr/bin/distrobox\n",
+                true,
+            );
         let t = detect(&r, &Recipe::bundled(), Path::new("/nonexistent"));
         assert_eq!(t.podman.as_ref().unwrap().to_string(), "5.7.0");
-        assert_eq!(t.distrobox.executable().as_deref(), Some("distrobox"));
+        assert_eq!(
+            t.distrobox.executable().as_deref(),
+            Some("/usr/bin/distrobox"),
+            "absolute path, so the menu entry works with any PATH"
+        );
         assert!(plan(&t, &ubuntu(), &Recipe::bundled(), Path::new("/h")).is_empty());
     }
 
@@ -199,6 +217,7 @@ mod tests {
             podman: None,
             distrobox: DistroboxChoice::Host {
                 version: "1.8.2".parse().unwrap(),
+                path: "/usr/bin/distrobox".into(),
             },
         };
         let nix = Distro::parse("ID=nixos\n");
