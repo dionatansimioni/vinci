@@ -35,6 +35,32 @@ Execução do plano de instalação real (`crates/core/examples/run_plan.rs`) ne
 4. **ffmpeg `-n` sai com código 0** quando recusa sobrescrever → nomes de saída únicos escolhidos antes de rodar.
 5. Extração do zip movida para dentro do container (o host pode não ter `unzip`).
 
+## Segunda rodada — fluxo completo (`flow::install_resolve`)
+
+Mesma máquina, executando a função que a interface usa (`crates/core/examples/install.rs`): plano + atalho + ícone + MIME + estado + cópia do instalador.
+
+| Passo | Tempo |
+|---|---|
+| PullImage | 2 s |
+| RemoveExisting (reinstalação) | 3 s |
+| Create | < 1 s |
+| Initialize (init do distrobox, primeira vez) | 197 s |
+| InstallPackages | 65 s |
+| ExtractInstaller | 57 s |
+| InstallResolve | 167 s |
+| Verify + RemoveConflictingLibs | < 1 s |
+
+Resultado: `installed vinci-free 21.1.2`. Atalho válido (`desktop-file-validate`), ícone 128×128 instalado, `*.drp` registrado no banco MIME, instalador guardado por hard link (sem espaço extra) e pasta de trabalho apagada.
+
+Bugs que só a execução real revelou (todos corrigidos, com teste):
+
+6. `unzip -d` não cria pastas intermediárias (`~/.cache/vinci` não existe numa máquina nova).
+7. Reinstalar falharia: `distrobox create` recusa nome existente → passo `RemoveExisting` depois do download.
+8. `Exec=` do atalho saiu com `distrobox` sem caminho absoluto → numa sessão gráfica com outro PATH o atalho não abriria.
+9. `apt-get update` sai com 0 mesmo sem rede → `--error-on=any` (achado pelo vigia).
+
+Conversão de mídia testada dentro do container: todos os presets, progresso ao vivo e API da Blackmagic pela rede do container.
+
 ## Ainda não testado
 
 - podman **rootless** com usuário comum (caminho real dos usuários).
