@@ -165,11 +165,13 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
             argv: in_box_user(
                 t,
                 &name,
+                // unzip -d does not create missing parents (~/.cache/vinci on a fresh system).
                 s(&[
-                    "unzip",
-                    "-o",
+                    "sh",
+                    "-c",
+                    r#"set -e; mkdir -p "$2"; unzip -o -q "$1" -d "$2""#,
+                    "sh",
                     &t.installer.to_string_lossy(),
-                    "-d",
                     &t.work_dir.to_string_lossy(),
                 ]),
             ),
@@ -300,7 +302,7 @@ mod tests {
         );
         assert_eq!(
             &argv_of(&plan, ExtractInstaller)[..6],
-            ["distrobox", "enter", "--name", "vinci-free", "--", "unzip"]
+            ["distrobox", "enter", "--name", "vinci-free", "--", "sh"]
         );
         let install = argv_of(&plan, InstallPackages);
         assert!(
@@ -377,6 +379,47 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Runs the real extraction snippet into a work dir whose parents don't exist yet,
+    /// which is the situation on a fresh system (found by the end-to-end run).
+    #[test]
+    fn extract_creates_missing_work_dir() {
+        if std::process::Command::new("unzip")
+            .arg("-v")
+            .output()
+            .is_err()
+        {
+            return;
+        }
+        let base = std::env::temp_dir().join(format!("rli-extract-{}", std::process::id()));
+        std::fs::create_dir_all(&base).unwrap();
+        let zip = base.join("DaVinci_Resolve_21.1.2_Linux.zip");
+        let made = std::process::Command::new("python3")
+            .args(["-c", "import sys,zipfile; z=zipfile.ZipFile(sys.argv[1],'w'); z.writestr('DaVinci_Resolve_21.1.2_Linux.run','#!/bin/sh'); z.close()"])
+            .arg(&zip)
+            .status()
+            .unwrap()
+            .success();
+        assert!(made);
+        let work = base.join("home/.cache/vinci/work");
+        let r = Recipe::bundled();
+        let plan = install_plan(
+            &r,
+            &Target {
+                work_dir: &work,
+                ..target(Vendor::Nvidia, &zip)
+            },
+        );
+        let argv = &argv_of(&plan, StepKind::ExtractInstaller)[5..];
+        let ok = std::process::Command::new(&argv[0])
+            .args(&argv[1..])
+            .status()
+            .unwrap()
+            .success();
+        let extracted = work.join("DaVinci_Resolve_21.1.2_Linux.run").exists();
+        std::fs::remove_dir_all(&base).unwrap();
+        assert!(ok && extracted);
     }
 
     /// Runs the generated shell snippets for real against a temp dir, to prove the
