@@ -1,0 +1,5 @@
+NAME="SteamOS"
+PRETTY_NAME="SteamOS"
+ID=steamos
+ID_LIKE=arch
+VARIANT_ID=steamdeck

@@ -1,0 +1,5 @@
+NAME="Bazzite"
+ID=bazzite
+ID_LIKE="fedora"
+VERSION_ID="43"
+PRETTY_NAME="Bazzite 43"

@@ -1,0 +1,10 @@
+[package]
+name = "resolve-linux-installer"
+description = "Unofficial installer for DaVinci Resolve on any Linux distro"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rli-core = { path = "../core" }
