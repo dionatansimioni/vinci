@@ -12,6 +12,8 @@ use std::path::Path;
 pub enum StepKind {
     PullImage,
     Create,
+    /// First entry runs distrobox's init (users, sudo); wait for it before using sudo.
+    Initialize,
     AddRepository,
     InstallPackages,
     ExtractInstaller,
@@ -97,6 +99,10 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
     steps.push(Step {
         kind: StepKind::Create,
         argv: create,
+    });
+    steps.push(Step {
+        kind: StepKind::Initialize,
+        argv: in_box_user(t, &name, s(&["sudo", "-n", "true"])),
     });
 
     if let Some(repo) = setup.and_then(|v| v.apt_repo.as_ref()) {
@@ -245,6 +251,7 @@ mod tests {
             [
                 PullImage,
                 Create,
+                Initialize,
                 InstallPackages,
                 ExtractInstaller,
                 InstallResolve,
@@ -253,13 +260,18 @@ mod tests {
         );
         assert!(plan[1].argv.contains(&"--nvidia".to_string()));
         assert_eq!(
-            &plan[3].argv[..6],
+            &plan[2].argv[5..],
+            ["sudo", "-n", "true"],
+            "waits for distrobox init before any sudo step"
+        );
+        assert_eq!(
+            &plan[4].argv[..6],
             ["distrobox", "enter", "--name", "vinci-free", "--", "unzip"]
         );
-        let install = &plan[2].argv;
+        let install = &plan[3].argv;
         assert!(install.contains(&"ffmpeg".to_string()));
         assert!(!install.contains(&"rocm-opencl-runtime".to_string()));
-        let run = &plan[4].argv;
+        let run = &plan[5].argv;
         assert!(run.contains(&"SKIP_PACKAGE_CHECK=1".to_string()));
         assert!(
             run.contains(&"/home/u/.cache/vinci/work/DaVinci_Resolve_21.1.2_Linux.run".to_string())
@@ -272,11 +284,11 @@ mod tests {
         let zip = zip();
         let plan = install_plan(&r, &target(Vendor::Amd, &zip));
         assert!(!plan[1].argv.contains(&"--nvidia".to_string()));
-        assert_eq!(plan[2].kind, StepKind::AddRepository);
-        let repo = &plan[2].argv;
+        assert_eq!(plan[3].kind, StepKind::AddRepository);
+        let repo = &plan[3].argv;
         assert!(repo.contains(&"https://repo.radeon.com/rocm/rocm.gpg.key".to_string()));
         assert!(repo.contains(&"rocm".to_string()));
-        assert!(plan[3].argv.contains(&"rocm-opencl-runtime".to_string()));
+        assert!(plan[4].argv.contains(&"rocm-opencl-runtime".to_string()));
     }
 
     #[test]
