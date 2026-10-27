@@ -31,8 +31,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build test binary
         run: cargo test -p rli-core --lib --no-run
-      - name: ffmpeg presets inside Ubuntu 24.04
+      - name: Real ffmpeg, conversion and network tests inside Ubuntu 24.04
         run: |
           bin=$(ls -t target/debug/deps/rli_core-* | grep -v '\.d$' | head -1)
           podman run --rm --network host -v "$PWD:$PWD" -w "$PWD" docker.io/library/ubuntu:24.04 sh -c \
-            "apt-get update --error-on=any -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg >/dev/null && $bin --ignored real_ffmpeg"
+            "apt-get update --error-on=any -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ffmpeg >/dev/null && $bin --ignored real_"
