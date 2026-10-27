@@ -8,6 +8,7 @@ pub mod ffmpeg;
 pub mod gpu;
 pub mod hardware;
 pub mod host;
+pub mod installer;
 pub mod installer_file;
 pub mod known_bad;
 pub mod launcher;

@@ -102,36 +102,56 @@ pub mod fake {
     use super::*;
     use std::cell::RefCell;
 
-    /// Records every command and answers from a list of (argv prefix, output) rules.
+    /// Records every command and answers from (argv prefix, output) rules. The first
+    /// matching rule wins; `once` rules are consumed when used.
     #[derive(Default)]
     pub struct FakeRunner {
         pub calls: RefCell<Vec<Vec<String>>>,
-        pub rules: Vec<(Vec<String>, Output)>,
+        rules: RefCell<Vec<(Vec<String>, Output, bool)>>,
     }
 
     impl FakeRunner {
-        pub fn respond(mut self, prefix: &[&str], stdout: &str, success: bool) -> Self {
-            self.rules.push((
-                argv(prefix),
-                Output {
-                    success,
-                    code: Some(if success { 0 } else { 1 }),
-                    stdout: stdout.into(),
-                    stderr: String::new(),
+        fn add(self, prefix: &[&str], stdout: &str, success: bool, once: bool) -> Self {
+            let out = Output {
+                success,
+                code: Some(if success { 0 } else { 1 }),
+                stdout: stdout.into(),
+                stderr: if success {
+                    String::new()
+                } else {
+                    "failed".into()
                 },
-            ));
+            };
+            self.rules.borrow_mut().push((argv(prefix), out, once));
             self
+        }
+
+        pub fn respond(self, prefix: &[&str], stdout: &str, success: bool) -> Self {
+            self.add(prefix, stdout, success, false)
+        }
+
+        /// Answers only the next matching call, then falls through to later rules.
+        pub fn respond_once(self, prefix: &[&str], stdout: &str, success: bool) -> Self {
+            self.add(prefix, stdout, success, true)
+        }
+
+        pub fn calls(&self) -> Vec<Vec<String>> {
+            self.calls.borrow().clone()
         }
     }
 
     impl Runner for FakeRunner {
         fn run(&self, argv: &[String]) -> std::io::Result<Output> {
             self.calls.borrow_mut().push(argv.to_vec());
-            self.rules
-                .iter()
-                .find(|(prefix, _)| argv.starts_with(prefix))
-                .map(|(_, out)| Ok(out.clone()))
-                .unwrap_or_else(|| Err(std::io::Error::from(std::io::ErrorKind::NotFound)))
+            let mut rules = self.rules.borrow_mut();
+            let Some(i) = rules.iter().position(|(p, _, _)| argv.starts_with(p)) else {
+                return Err(std::io::Error::from(std::io::ErrorKind::NotFound));
+            };
+            let out = rules[i].1.clone();
+            if rules[i].2 {
+                rules.remove(i);
+            }
+            Ok(out)
         }
     }
 }
