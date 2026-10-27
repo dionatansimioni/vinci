@@ -42,13 +42,13 @@ pub struct State {
 }
 
 impl State {
-    /// Default location: `$XDG_STATE_HOME/resolve-linux-installer/state.json`.
+    /// Default location: `$XDG_STATE_HOME/vinci/state.json`.
     pub fn default_path() -> PathBuf {
         let base = std::env::var_os("XDG_STATE_HOME")
             .map(PathBuf::from)
             .filter(|p| p.is_absolute())
             .unwrap_or_else(|| home().join(".local/state"));
-        base.join("resolve-linux-installer/state.json")
+        base.join("vinci/state.json")
     }
 
     /// Loads the state; a missing file means a fresh system.

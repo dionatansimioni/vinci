@@ -1,4 +1,4 @@
-//! Core logic of Resolve Linux Installer, kept free of GUI dependencies so it can be
+//! Core logic of Vinci, kept free of GUI dependencies so it can be
 //! unit-tested and reused by the background service.
 
 pub mod distro;

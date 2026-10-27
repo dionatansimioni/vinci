@@ -1,6 +1,6 @@
 [package]
 name = "rli-core"
-description = "Core logic for Resolve Linux Installer (no GUI dependencies)"
+description = "Core logic for Vinci (no GUI dependencies)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

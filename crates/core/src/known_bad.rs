@@ -6,7 +6,8 @@ use crate::installer_file::Edition;
 use crate::version::Version;
 use serde::Deserialize;
 
-pub const URL: &str = "https://raw.githubusercontent.com/dionatansimioni/resolve-linux-installer/main/data/known-bad.json";
+pub const URL: &str =
+    "https://raw.githubusercontent.com/dionatansimioni/vinci/main/data/known-bad.json";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "lowercase")]

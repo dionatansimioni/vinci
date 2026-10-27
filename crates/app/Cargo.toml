@@ -1,5 +1,5 @@
 [package]
-name = "resolve-linux-installer"
+name = "vinci"
 description = "Unofficial installer for DaVinci Resolve on any Linux distro"
 version.workspace = true
 edition.workspace = true
