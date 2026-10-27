@@ -15,6 +15,7 @@ use rli_core::host::{HostRunner, Runner};
 use rli_core::installer::Event;
 use rli_core::installer_file::{self, parse_filename, InstallerFile};
 use rli_core::recipe::Recipe;
+use rli_core::remote::{self, UpdateInfo};
 use rli_core::state::{self, State, ToolSource};
 use rli_core::tools::{self, Action};
 use rli_core::{diagnostics, integrate, launcher};
@@ -55,6 +56,8 @@ pub struct App {
     outcome: Option<Outcome>,
     error: Option<(String, String)>,
     toasts: adw::ToastOverlay,
+    installed: Option<rli_core::state::Installation>,
+    update: Option<UpdateInfo>,
 }
 
 #[derive(Debug)]
@@ -77,9 +80,11 @@ pub enum Cmd {
     Progress(Event),
     HostReady,
     Finished(Result<Outcome, (String, String)>),
+    Update(UpdateInfo),
 }
 
 pub struct Widgets {
+    banner: adw::Banner,
     stack: gtk::Stack,
     status: adw::StatusPage,
     check_group: adw::PreferencesGroup,
@@ -225,6 +230,10 @@ impl Component for App {
             outcome: None,
             error: None,
             toasts: toasts.clone(),
+            installed: State::load(&State::default_path())
+                .ok()
+                .and_then(|s| s.installation),
+            update: None,
         };
         let input = |m: fn() -> Msg| {
             let sender = sender.clone();
@@ -336,13 +345,32 @@ impl Component for App {
         stack.add_named(&done_box, Some(Page::Done.name()));
         stack.add_named(&failed_box, Some(Page::Failed.name()));
 
+        let banner = adw::Banner::builder().button_label(tr("Update")).build();
+        banner.connect_button_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(Msg::Proceed)
+        });
         let toolbar = adw::ToolbarView::new();
         toolbar.add_top_bar(&adw::HeaderBar::new());
+        toolbar.add_top_bar(&banner);
         toasts.set_child(Some(&stack));
         toolbar.set_content(Some(&toasts));
         root.set_content(Some(&toolbar));
 
+        if let Some(inst) = model.installed.clone() {
+            // Offline-first: a failed check just shows nothing.
+            sender.spawn_command(move |out| {
+                let info = remote::check_update(
+                    &remote::Http::new(),
+                    &Recipe::bundled(),
+                    inst.edition,
+                    Some(&inst.version),
+                );
+                let _ = out.send(Cmd::Update(info));
+            });
+        }
         let mut widgets = Widgets {
+            banner,
             stack,
             status,
             check_group,
@@ -455,6 +483,7 @@ impl Component for App {
             }
             Cmd::Progress(Event::Finished { .. }) => self.progress.0 += 1,
             Cmd::HostReady => {}
+            Cmd::Update(info) => self.update = Some(info),
             Cmd::Finished(Ok(outcome)) => {
                 self.outcome = Some(outcome);
                 self.page = Page::Done;
@@ -469,6 +498,35 @@ impl Component for App {
 
     fn update_view(&self, w: &mut Widgets, _sender: ComponentSender<Self>) {
         w.stack.set_visible_child_name(self.page.name());
+        match &self.update {
+            Some(UpdateInfo {
+                latest: Some(v),
+                update_available: true,
+                latest_is_bad: None,
+            }) => {
+                w.banner.set_title(
+                    &tr("DaVinci Resolve {version} is available")
+                        .replace("{version}", &v.to_string()),
+                );
+                w.banner.set_button_label(Some(&tr("Update")));
+                w.banner.set_revealed(self.page == Page::Check);
+            }
+            Some(UpdateInfo {
+                latest: Some(v),
+                update_available: true,
+                latest_is_bad: Some(bad),
+            }) => {
+                w.banner.set_title(&format!(
+                    "{} ({})",
+                    tr("Version {version} has known problems. Keep your current version for now.")
+                        .replace("{version}", &v.to_string()),
+                    bad.reason
+                ));
+                w.banner.set_button_label(None);
+                w.banner.set_revealed(self.page == Page::Check);
+            }
+            _ => w.banner.set_revealed(false),
+        }
 
         let distro = self
             .distro

@@ -272,3 +272,12 @@ msgstr "Copiar relatório de diagnóstico"
 
 msgid "Diagnostic report copied. Paste it in your issue or message."
 msgstr "Relatório de diagnóstico copiado. Cole na sua issue ou mensagem."
+
+msgid "Update"
+msgstr "Atualizar"
+
+msgid "DaVinci Resolve {version} is available"
+msgstr "O DaVinci Resolve {version} está disponível"
+
+msgid "Version {version} has known problems. Keep your current version for now."
+msgstr "A versão {version} tem problemas conhecidos. Mantenha a versão atual por enquanto."

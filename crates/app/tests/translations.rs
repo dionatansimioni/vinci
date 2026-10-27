@@ -102,6 +102,14 @@ fn languages() -> Vec<String> {
         .collect()
 }
 
+/// `{name}` markers the code substitutes at runtime; translations must keep them.
+fn placeholders(s: &str) -> BTreeSet<String> {
+    s.split('{')
+        .skip(1)
+        .filter_map(|p| p.split_once('}').map(|(name, _)| name.to_string()))
+        .collect()
+}
+
 #[test]
 fn every_ui_string_is_translated() {
     let ids = source_msgids();
@@ -116,6 +124,16 @@ fn every_ui_string_is_translated() {
         assert!(
             missing.is_empty(),
             "{lang}: missing translations for {missing:#?}"
+        );
+        let broken: Vec<_> = po
+            .entries
+            .iter()
+            .filter(|(id, tr)| placeholders(id) != placeholders(tr))
+            .map(|(id, _)| id)
+            .collect();
+        assert!(
+            broken.is_empty(),
+            "{lang}: placeholders changed in {broken:#?}"
         );
         let stale: Vec<_> = po.entries.keys().filter(|k| !ids.contains(*k)).collect();
         assert!(
