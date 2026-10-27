@@ -125,6 +125,29 @@ pub fn failure(e: &flow::Error) -> String {
     }
 }
 
+/// Title and explanation for a problem found by the self-check.
+pub fn problem(p: &rli_core::health::Problem) -> (String, String) {
+    use rli_core::health::Problem;
+    match p {
+        Problem::ContainerMissing => (
+            tr("The Resolve container is missing"),
+            tr("It may have been removed by a system cleanup. Reinstall to get it back; your projects are safe."),
+        ),
+        Problem::ResolveMissing => (
+            tr("DaVinci Resolve is missing from its container"),
+            tr("Reinstall to fix it; your projects are safe."),
+        ),
+        Problem::LauncherMissing => (
+            tr("The menu entry is missing"),
+            tr("Vinci can create it again."),
+        ),
+        Problem::GpuNotVisible => (
+            tr("The GPU is not visible to Resolve"),
+            tr("This usually happens after a driver update. Restart the computer; if it persists, copy the diagnostic report and ask for help."),
+        ),
+    }
+}
+
 pub fn severity_icon(s: Severity) -> &'static str {
     match s {
         Severity::Info => "dialog-information-symbolic",

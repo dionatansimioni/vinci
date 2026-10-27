@@ -371,3 +371,30 @@ msgstr "Desinstalado, com avisos:"
 
 msgid "Uninstall…"
 msgstr "Desinstalar…"
+
+msgid "DaVinci Resolve is missing from its container"
+msgstr "O DaVinci Resolve sumiu do container"
+
+msgid "It may have been removed by a system cleanup. Reinstall to get it back; your projects are safe."
+msgstr "Ele pode ter sido removido por uma limpeza do sistema. Reinstale para recuperá-lo; seus projetos estão seguros."
+
+msgid "Reinstall to fix it; your projects are safe."
+msgstr "Reinstale para corrigir; seus projetos estão seguros."
+
+msgid "Repair"
+msgstr "Reparar"
+
+msgid "The GPU is not visible to Resolve"
+msgstr "O Resolve não está enxergando a GPU"
+
+msgid "The Resolve container is missing"
+msgstr "O container do Resolve não foi encontrado"
+
+msgid "The menu entry is missing"
+msgstr "O atalho no menu sumiu"
+
+msgid "This usually happens after a driver update. Restart the computer; if it persists, copy the diagnostic report and ask for help."
+msgstr "Isso costuma acontecer depois de atualizar o driver. Reinicie o computador; se continuar, copie o relatório de diagnóstico e peça ajuda."
+
+msgid "Vinci can create it again."
+msgstr "O Vinci pode criá-lo de novo."

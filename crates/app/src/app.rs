@@ -12,6 +12,7 @@ use rli_core::distro::Distro;
 use rli_core::flow::{self, Outcome};
 use rli_core::gpu::Gpu;
 use rli_core::hardware::{self, Report};
+use rli_core::health::{self, Problem, Repair};
 use rli_core::host::{HostRunner, Runner};
 use rli_core::installer::Event;
 use rli_core::installer_file::{self, parse_filename, InstallerFile};
@@ -60,6 +61,7 @@ pub struct App {
     _media: Controller<Media>,
     installed: Option<rli_core::state::Installation>,
     update: Option<UpdateInfo>,
+    problems: Vec<Problem>,
 }
 
 #[derive(Debug)]
@@ -73,6 +75,8 @@ pub enum Msg {
     StartInstall(InstallerFile),
     OpenResolve,
     AskUninstall,
+    Repair(Repair),
+    RunHealth,
     Uninstall {
         delete_projects: bool,
         tools: Vec<String>,
@@ -89,11 +93,13 @@ pub enum Cmd {
     Finished(Result<Outcome, (String, String)>),
     Update(UpdateInfo),
     Uninstalled(rli_core::uninstall::Summary),
+    Health(Vec<Problem>),
 }
 
 pub struct Widgets {
     installed_group: adw::PreferencesGroup,
     installed_row: adw::ActionRow,
+    problem_rows: Vec<adw::ActionRow>,
     banner: adw::Banner,
     stack: gtk::Stack,
     status: adw::StatusPage,
@@ -247,6 +253,7 @@ impl Component for App {
                 .ok()
                 .and_then(|s| s.installation),
             update: None,
+            problems: Vec::new(),
         };
         let input = |m: fn() -> Msg| {
             let sender = sender.clone();
@@ -406,9 +413,11 @@ impl Component for App {
                 let _ = out.send(Cmd::Update(info));
             });
         }
+        sender.input(Msg::RunHealth);
         let mut widgets = Widgets {
             installed_group,
             installed_row,
+            problem_rows: Vec::new(),
             banner,
             stack,
             status,
@@ -484,6 +493,61 @@ impl Component for App {
             }
             Msg::StartInstall(file) => self.start_install(file, &sender),
             Msg::AskUninstall => self.ask_uninstall(&sender, root),
+            Msg::RunHealth => {
+                let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
+                else {
+                    self.problems.clear();
+                    return;
+                };
+                sender.spawn_command(move |out| {
+                    let runner = HostRunner::new();
+                    let home = state::home();
+                    let recipe = Recipe::bundled();
+                    let tools = tools::detect(&runner, &recipe, &home);
+                    let problems = match tools.distrobox.executable() {
+                        Some(dbx) => health::check(
+                            &runner,
+                            &recipe,
+                            &dbx,
+                            &inst,
+                            Some(gpu.vendor),
+                            &integrate::data_home(&home),
+                        ),
+                        None => vec![Problem::ContainerMissing],
+                    };
+                    let _ = out.send(Cmd::Health(problems));
+                });
+            }
+            Msg::Repair(Repair::Reinstall) => sender.input(Msg::Proceed),
+            Msg::Repair(Repair::Explain) => {}
+            Msg::Repair(Repair::RecreateLauncher) => {
+                let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
+                else {
+                    return;
+                };
+                let gpus = self.gpus.clone();
+                let input = sender.input_sender().clone();
+                sender.spawn_command(move |_out| {
+                    let runner = HostRunner::new();
+                    let home = state::home();
+                    let recipe = Recipe::bundled();
+                    if let Some(dbx) = tools::detect(&runner, &recipe, &home)
+                        .distrobox
+                        .executable()
+                    {
+                        let _ = flow::write_launcher(
+                            &runner,
+                            &recipe,
+                            &dbx,
+                            &inst,
+                            &gpus,
+                            &gpu,
+                            &integrate::data_home(&home),
+                        );
+                    }
+                    input.emit(Msg::RunHealth);
+                });
+            }
             Msg::Uninstall {
                 delete_projects,
                 tools,
@@ -554,6 +618,7 @@ impl Component for App {
             Cmd::Progress(Event::Finished { .. }) => self.progress.0 += 1,
             Cmd::HostReady => {}
             Cmd::Update(info) => self.update = Some(info),
+            Cmd::Health(problems) => self.problems = problems,
             Cmd::Uninstalled(summary) => {
                 self.installed = None;
                 self.outcome = None;
@@ -630,6 +695,28 @@ impl Component for App {
                 i.version
             ));
             w.installed_row.set_subtitle(&tr("Installed"));
+        }
+        for row in w.problem_rows.drain(..) {
+            w.installed_group.remove(&row);
+        }
+        for p in &self.problems {
+            let (title, subtitle) = messages::problem(p);
+            let row = adw::ActionRow::builder()
+                .title(title)
+                .subtitle(subtitle)
+                .subtitle_lines(0)
+                .build();
+            row.add_prefix(&gtk::Image::from_icon_name("dialog-warning-symbolic"));
+            let repair = p.repair();
+            if repair != Repair::Explain {
+                let b = button(&tr("Repair"), &[]);
+                b.set_valign(gtk::Align::Center);
+                let sender = _sender.clone();
+                b.connect_clicked(move |_| sender.input(Msg::Repair(repair)));
+                row.add_suffix(&b);
+            }
+            w.installed_group.add(&row);
+            w.problem_rows.push(row);
         }
         for row in w.check_rows.drain(..) {
             w.check_group.remove(&row);

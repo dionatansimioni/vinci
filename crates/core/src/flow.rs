@@ -76,6 +76,38 @@ fn keep_installer(file: &Path, dir: &Path) -> std::io::Result<()> {
     Ok(())
 }
 
+/// Writes the menu entry, icon and file types for an existing install. Used by the
+/// install itself and by the "Repair" action when the entry was deleted.
+pub fn write_launcher(
+    runner: &dyn Runner,
+    recipe: &Recipe,
+    distrobox: &str,
+    installation: &Installation,
+    gpus: &[Gpu],
+    gpu: &Gpu,
+    data_home: &Path,
+) -> std::io::Result<()> {
+    let env = launcher::environment(recipe, gpus, gpu);
+    let entry = launcher::desktop_file(
+        recipe,
+        &launcher::Entry {
+            distrobox,
+            container: &installation.container,
+            name: display_name(installation.edition),
+            env: &env,
+        },
+    );
+    integrate::install(
+        runner,
+        recipe,
+        distrobox,
+        &installation.container,
+        data_home,
+        &entry,
+    )
+    .map(drop)
+}
+
 pub fn install_resolve(
     runner: &dyn Runner,
     recipe: &Recipe,
@@ -105,18 +137,21 @@ pub fn install_resolve(
     let _ = std::fs::remove_dir_all(&work);
     result?;
 
-    let env = launcher::environment(recipe, req.gpus, req.gpu);
-    let entry = launcher::desktop_file(
+    let installation = Installation {
+        container: name,
+        edition,
+        version: req.installer.version.clone(),
+    };
+    write_launcher(
+        runner,
         recipe,
-        &launcher::Entry {
-            distrobox: req.distrobox,
-            container: &name,
-            name: display_name(edition),
-            env: &env,
-        },
-    );
-    integrate::install(runner, recipe, req.distrobox, &name, req.data_home, &entry)
-        .map_err(Error::Integrate)?;
+        req.distrobox,
+        &installation,
+        req.gpus,
+        req.gpu,
+        req.data_home,
+    )
+    .map_err(Error::Integrate)?;
 
     if req.keep_installer {
         // Best effort: a full disk here must not fail an install that already worked.
@@ -124,11 +159,6 @@ pub fn install_resolve(
     }
 
     let mut state = State::load(req.state_path).map_err(Error::State)?;
-    let installation = Installation {
-        container: name,
-        edition,
-        version: req.installer.version.clone(),
-    };
     let replaced = state
         .installation
         .replace(installation.clone())
@@ -260,6 +290,29 @@ mod tests {
             .collect();
         assert_eq!(kept.len(), 1, "only the latest installer is kept");
         std::mem::forget(studio); // same home as `free`, which cleans it up
+    }
+
+    #[test]
+    fn repair_rewrites_a_deleted_launcher() {
+        let env = Env::new("repair", Edition::Free);
+        let out = env.run(&ok_runner()).unwrap();
+        let data = env.home.join(".local/share");
+        let desktop = launcher::paths(&data).desktop;
+        std::fs::remove_file(&desktop).unwrap();
+        let gpus = [nvidia()];
+        write_launcher(
+            &ok_runner(),
+            &Recipe::bundled(),
+            "distrobox",
+            &out.installation,
+            &gpus,
+            &gpus[0],
+            &data,
+        )
+        .unwrap();
+        assert!(std::fs::read_to_string(desktop)
+            .unwrap()
+            .contains("--name vinci-free"));
     }
 
     #[test]
