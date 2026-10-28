@@ -6,7 +6,7 @@
 # Bump `revision` on every change; bump `schema` only when the format changes.
 
 schema = 1
-revision = 3
+revision = 4
 
 [container]
 image = "docker.io/library/ubuntu:24.04"
@@ -120,4 +120,4 @@ QT_QPA_PLATFORM = "xcb"
 [blackmagic]
 latest_free = "https://www.blackmagicdesign.com/api/support/latest-stable-version/davinci-resolve/linux"
 latest_studio = "https://www.blackmagicdesign.com/api/support/latest-stable-version/davinci-resolve-studio/linux"
-download_page = "https://www.blackmagicdesign.com/support/family/davinci-resolve-and-fusion"
+download_page = "https://www.blackmagicdesign.com/products/davinciresolve"
