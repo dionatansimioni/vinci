@@ -64,6 +64,7 @@ pub struct App {
     problems: Vec<Problem>,
     backup: Option<rli_core::state::Installation>,
     restoring: bool,
+    usb_configured: bool,
 }
 
 #[derive(Debug)]
@@ -77,6 +78,7 @@ pub enum Msg {
     StartInstall(InstallerFile),
     OpenResolve,
     AskUninstall,
+    SetupUsb,
     Preferences,
     SettingsChanged,
     Restore,
@@ -101,6 +103,7 @@ pub enum Cmd {
     Uninstalled(rli_core::uninstall::Summary),
     Health(Vec<Problem>),
     Restored(Result<rli_core::state::Installation, String>),
+    UsbConfigured(Result<usize, String>),
 }
 
 pub struct Widgets {
@@ -108,6 +111,8 @@ pub struct Widgets {
     installed_row: adw::ActionRow,
     problem_rows: Vec<adw::ActionRow>,
     restore_row: adw::ActionRow,
+    usb_row: adw::ActionRow,
+    usb_button: gtk::Button,
     banner: adw::Banner,
     stack: gtk::Stack,
     status: adw::StatusPage,
@@ -300,6 +305,8 @@ impl Component for App {
                 .ok()
                 .and_then(|s| s.backup),
             restoring: false,
+            usb_configured: State::load(&State::default_path())
+                .is_ok_and(|s| !s.udev_rules.is_empty()),
         };
         let input = |m: fn() -> Msg| {
             let sender = sender.clone();
@@ -333,6 +340,15 @@ impl Component for App {
         restore.connect_clicked(input(|| Msg::Restore));
         restore_row.add_suffix(&restore);
         installed_group.add(&restore_row);
+        let usb_row = adw::ActionRow::builder()
+            .title(tr("Blackmagic USB devices"))
+            .build();
+        usb_row.add_prefix(&gtk::Image::from_icon_name("media-removable-symbolic"));
+        let usb_button = button(&tr("Set up"), &[]);
+        usb_button.set_valign(gtk::Align::Center);
+        usb_button.connect_clicked(input(|| Msg::SetupUsb));
+        usb_row.add_suffix(&usb_button);
+        installed_group.add(&usb_row);
         let recheck = button(&tr("Check again"), &["pill"]);
         recheck.connect_clicked(input(|| Msg::Recheck));
         let proceed = button(&tr("Continue"), &["suggested-action", "pill"]);
@@ -482,6 +498,8 @@ impl Component for App {
             installed_row,
             problem_rows: Vec::new(),
             restore_row,
+            usb_row,
+            usb_button,
             banner,
             stack,
             status,
@@ -617,6 +635,44 @@ impl Component for App {
                     let _ = out.send(Cmd::Restored(result));
                 });
             }
+            Msg::SetupUsb => {
+                let Some(inst) = self.installed.clone() else {
+                    return;
+                };
+                sender.spawn_command(move |out| {
+                    let runner = HostRunner::new();
+                    let home = state::home();
+                    let recipe = Recipe::bundled();
+                    let result = (|| {
+                        let dbx = tools::detect(&runner, &recipe, &home)
+                            .distrobox
+                            .executable()
+                            .ok_or_else(|| tr("distrobox is missing"))?;
+                        let staging = home.join(".cache/vinci/udev");
+                        let (ok, _rejected) = rli_core::udev::stage(
+                            &runner,
+                            &recipe,
+                            &dbx,
+                            &inst.container,
+                            &staging,
+                        )
+                        .map_err(|e| e.to_string())?;
+                        let o = runner
+                            .run_root(&rli_core::udev::install_command(&ok))
+                            .map_err(|e| e.to_string())?;
+                        if !o.success {
+                            return Err(o.stderr);
+                        }
+                        let path = State::default_path();
+                        let mut st = State::load(&path).unwrap_or_default();
+                        st.udev_rules = rli_core::udev::host_paths(&ok);
+                        st.save(&path).map_err(|e| e.to_string())?;
+                        let _ = std::fs::remove_dir_all(&staging);
+                        Ok(ok.len())
+                    })();
+                    let _ = out.send(Cmd::UsbConfigured(result));
+                });
+            }
             Msg::RunHealth => {
                 let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
                 else {
@@ -743,6 +799,18 @@ impl Component for App {
             Cmd::HostReady => {}
             Cmd::Update(info) => self.update = Some(info),
             Cmd::Health(problems) => self.problems = problems,
+            Cmd::UsbConfigured(Ok(_)) => {
+                self.usb_configured = true;
+                self.toasts.add_toast(adw::Toast::new(&tr(
+                    "USB devices set up. Reconnect the dongle or panel if it was already plugged in.",
+                )));
+            }
+            Cmd::UsbConfigured(Err(e)) => {
+                self.toasts.add_toast(adw::Toast::new(&format!(
+                    "{} {e}",
+                    tr("Could not set up USB devices:")
+                )));
+            }
             Cmd::Restored(result) => {
                 self.restoring = false;
                 match result {
@@ -844,6 +912,12 @@ impl Component for App {
             ));
             w.installed_row.set_subtitle(&tr("Installed"));
         }
+        w.usb_row.set_subtitle(&if self.usb_configured {
+            tr("Set up: Studio dongle, Speed Editor and panels")
+        } else {
+            tr("Needed for the Studio USB dongle, Speed Editor and panels (asks for your password)")
+        });
+        w.usb_button.set_visible(!self.usb_configured);
         w.restore_row.set_visible(self.backup.is_some());
         w.restore_row.set_sensitive(!self.restoring);
         if let Some(b) = &self.backup {

@@ -518,3 +518,21 @@ msgstr "Aguardando a instalação do DaVinci Resolve"
 
 msgid "Watching your folders"
 msgstr "Monitorando suas pastas"
+
+msgid "Blackmagic USB devices"
+msgstr "Dispositivos USB da Blackmagic"
+
+msgid "Could not set up USB devices:"
+msgstr "Não foi possível configurar os dispositivos USB:"
+
+msgid "Needed for the Studio USB dongle, Speed Editor and panels (asks for your password)"
+msgstr "Necessário para o dongle USB do Studio, o Speed Editor e os painéis (pede sua senha)"
+
+msgid "Set up"
+msgstr "Configurar"
+
+msgid "Set up: Studio dongle, Speed Editor and panels"
+msgstr "Configurado: dongle do Studio, Speed Editor e painéis"
+
+msgid "USB devices set up. Reconnect the dongle or panel if it was already plugged in."
+msgstr "Dispositivos USB configurados. Reconecte o dongle ou o painel se já estava conectado."
