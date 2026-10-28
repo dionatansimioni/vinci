@@ -1,4 +1,6 @@
+mod about;
 mod app;
+mod desktop;
 mod i18n;
 mod media;
 mod messages;

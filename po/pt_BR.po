@@ -4,55 +4,480 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinci\n"
 "Report-Msgid-Bugs-To: https://github.com/dionatansimioni/vinci/issues\n"
-"POT-Creation-Date: 2026-10-27 23:00+0000\n"
+"POT-Creation-Date: 2026-10-28 15:28+0000\n"
 "Language: pt_BR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: crates/app/src/app.rs:55
+#: crates/app/src/about.rs:20
+msgid ""
+"Installs and runs DaVinci Resolve on any Linux distribution, in an isolated "
+"container, and converts media Resolve can't open on Linux."
+msgstr ""
+"Instala e executa o DaVinci Resolve em qualquer distribuição Linux, num "
+"container isolado, e converte as mídias que o Resolve não abre no Linux."
+
+#: crates/app/src/about.rs:30
+msgid "Unofficial"
+msgstr "Não oficial"
+
+#: crates/app/src/about.rs:33
+msgid ""
+"Vinci is an independent project, not affiliated with Blackmagic Design. "
+"DaVinci Resolve is a trademark of Blackmagic Design Pty. Ltd. and is "
+"downloaded from its website under its own license."
+msgstr ""
+"O Vinci é um projeto independente, sem afiliação com a Blackmagic Design. "
+"DaVinci Resolve é marca registrada da Blackmagic Design Pty. Ltd. e é "
+"baixado do site dela, sob a licença dela."
+
+#: crates/app/src/app.rs:390
 msgid "System check"
 msgstr "Verificação do sistema"
 
-#: crates/app/src/app.rs:59
+#: crates/app/src/app.rs:396
+msgid "Open"
+msgstr "Abrir"
+
+#: crates/app/src/app.rs:399
+msgid "Uninstall…"
+msgstr "Desinstalar…"
+
+#: crates/app/src/app.rs:406
+msgid "Restore point saved before the last update"
+msgstr "Ponto de restauração salvo antes da última atualização"
+
+#: crates/app/src/app.rs:409
+msgid "Go back to this version"
+msgstr "Voltar a esta versão"
+
+#: crates/app/src/app.rs:415
+msgid "Blackmagic USB devices"
+msgstr "Dispositivos USB da Blackmagic"
+
+#: crates/app/src/app.rs:418
+msgid "Set up"
+msgstr "Configurar"
+
+#: crates/app/src/app.rs:423
 msgid "Check again"
 msgstr "Verificar novamente"
 
-#: crates/app/src/app.rs:65
+#: crates/app/src/app.rs:425 crates/app/src/app.rs:1130
 msgid "Continue"
 msgstr "Continuar"
 
-#: crates/app/src/app.rs:118
+#: crates/app/src/app.rs:427 crates/app/src/app.rs:526
+msgid "Copy diagnostic report"
+msgstr "Copiar relatório de diagnóstico"
+
+#: crates/app/src/app.rs:440 crates/app/src/app.rs:660
+msgid "Choose the installer"
+msgstr "Escolha o instalador"
+
+#: crates/app/src/app.rs:441
+msgid ""
+"Download DaVinci Resolve for Linux from Blackmagic Design's website. Vinci "
+"finds the file in your Downloads folder automatically."
+msgstr ""
+"Baixe o DaVinci Resolve para Linux no site da Blackmagic Design. O Vinci "
+"encontra o arquivo na sua pasta Downloads automaticamente."
+
+#: crates/app/src/app.rs:449
+msgid "Open download page"
+msgstr "Abrir página de download"
+
+#: crates/app/src/app.rs:451
+msgid "Choose file…"
+msgstr "Escolher arquivo…"
+
+#: crates/app/src/app.rs:453
+msgid "Back"
+msgstr "Voltar"
+
+#: crates/app/src/app.rs:489 crates/app/src/messages.rs:95
+msgid "Installing DaVinci Resolve"
+msgstr "Instalando o DaVinci Resolve"
+
+#: crates/app/src/app.rs:491
+msgid "This takes a few minutes. You can keep using your computer."
+msgstr "Isso leva alguns minutos. Você pode continuar usando o computador."
+
+#: crates/app/src/app.rs:504
+msgid "DaVinci Resolve is installed"
+msgstr "O DaVinci Resolve está instalado"
+
+#: crates/app/src/app.rs:506
+msgid ""
+"It is in your applications menu. Your projects stay in your home folder."
+msgstr ""
+"Ele está no menu de aplicativos. Seus projetos ficam na sua pasta pessoal."
+
+#: crates/app/src/app.rs:509
+msgid "Open DaVinci Resolve"
+msgstr "Abrir o DaVinci Resolve"
+
+#: crates/app/src/app.rs:516
+msgid "Installation failed"
+msgstr "A instalação falhou"
+
+#: crates/app/src/app.rs:524
+msgid "Try again"
+msgstr "Tentar novamente"
+
+#: crates/app/src/app.rs:543 crates/app/src/app.rs:1025
+msgid "Update"
+msgstr "Atualizar"
+
+#: crates/app/src/app.rs:549
+msgid "Installation"
+msgstr "Instalação"
+
+#: crates/app/src/app.rs:551
+msgid "Media"
+msgstr "Mídia"
+
+#: crates/app/src/app.rs:568 crates/app/src/preferences.rs:309
+msgid "Preferences"
+msgstr "Preferências"
+
+#: crates/app/src/app.rs:569
+msgid "About Vinci"
+msgstr "Sobre o Vinci"
+
+#: crates/app/src/app.rs:573
+msgid "Main menu"
+msgstr "Menu principal"
+
+#: crates/app/src/app.rs:656
+msgid "DaVinci Resolve installer"
+msgstr "Instalador do DaVinci Resolve"
+
+#: crates/app/src/app.rs:729 crates/app/src/app.rs:766
+#: crates/app/src/app.rs:1451 crates/app/src/preferences.rs:100
+msgid "distrobox is missing"
+msgstr "o distrobox não foi encontrado"
+
+#: crates/app/src/app.rs:876
+msgid "Diagnostic report copied. Paste it in your issue or message."
+msgstr "Relatório de diagnóstico copiado. Cole na sua issue ou mensagem."
+
+#: crates/app/src/app.rs:921
+msgid "Type your password in the window that opened"
+msgstr "Digite sua senha na janela que abriu"
+
+#: crates/app/src/app.rs:939
+msgid "Trying mirror"
+msgstr "Tentando o espelho"
+
+#: crates/app/src/app.rs:942
+msgid "Recreating the container and trying again"
+msgstr "Recriando o container e tentando de novo"
+
+#: crates/app/src/app.rs:950
+msgid ""
+"USB devices set up. Reconnect the dongle or panel if it was already plugged "
+"in."
+msgstr ""
+"Dispositivos USB configurados. Reconecte o dongle ou o painel se já estava "
+"conectado."
+
+#: crates/app/src/app.rs:956
+msgid "Could not set up USB devices:"
+msgstr "Não foi possível configurar os dispositivos USB:"
+
+#: crates/app/src/app.rs:967
+msgid "The previous version is back."
+msgstr "A versão anterior foi restaurada."
+
+#: crates/app/src/app.rs:972
+msgid "Could not restore:"
+msgstr "Não foi possível restaurar:"
+
+#: crates/app/src/app.rs:983
+msgid "DaVinci Resolve was uninstalled."
+msgstr "O DaVinci Resolve foi desinstalado."
+
+#: crates/app/src/app.rs:987
+msgid "Uninstalled, with warnings:"
+msgstr "Desinstalado, com avisos:"
+
+#: crates/app/src/app.rs:1022
+msgid "DaVinci Resolve {version} is available"
+msgstr "O DaVinci Resolve {version} está disponível"
+
+#: crates/app/src/app.rs:1035
+msgid ""
+"Version {version} has known problems. Keep your current version for now."
+msgstr ""
+"A versão {version} tem problemas conhecidos. Mantenha a versão atual por "
+"enquanto."
+
+#: crates/app/src/app.rs:1048
 msgid "Unknown distribution"
 msgstr "Distribuição desconhecida"
 
-#: crates/app/src/app.rs:123
+#: crates/app/src/app.rs:1051
 msgid "no compatible GPU"
 msgstr "nenhuma GPU compatível"
 
-#: crates/app/src/app.rs:133
+#: crates/app/src/app.rs:1060
+msgid "Installed"
+msgstr "Instalado"
+
+#: crates/app/src/app.rs:1063
+msgid "Set up: Studio dongle, Speed Editor and panels"
+msgstr "Configurado: dongle do Studio, Speed Editor e painéis"
+
+#: crates/app/src/app.rs:1065
+msgid ""
+"Needed for the Studio USB dongle, Speed Editor and panels (asks for your "
+"password)"
+msgstr ""
+"Necessário para o dongle USB do Studio, o Speed Editor e os painéis (pede "
+"sua senha)"
+
+#: crates/app/src/app.rs:1090
+msgid "Repair"
+msgstr "Reparar"
+
+#: crates/app/src/app.rs:1104
 msgid "Everything looks good"
 msgstr "Tudo certo"
 
-#: crates/app/src/app.rs:135
+#: crates/app/src/app.rs:1106
 msgid "This computer meets the requirements for DaVinci Resolve."
 msgstr "Este computador atende aos requisitos do DaVinci Resolve."
 
-#: crates/app/src/messages.rs:19
+#: crates/app/src/app.rs:1128
+msgid "Update or reinstall"
+msgstr "Atualizar ou reinstalar"
+
+#: crates/app/src/app.rs:1143 crates/app/src/app.rs:1315
+msgid "Install"
+msgstr "Instalar"
+
+#: crates/app/src/app.rs:1152
+msgid "Waiting for the download to finish in your Downloads folder…"
+msgstr "Aguardando o download terminar na pasta Downloads…"
+
+#: crates/app/src/app.rs:1154
+msgid "No installer found in your Downloads folder yet."
+msgstr "Nenhum instalador encontrado na pasta Downloads ainda."
+
+#: crates/app/src/app.rs:1165
+msgid "about {minutes} min left"
+msgstr "cerca de {minutes} min restantes"
+
+#: crates/app/src/app.rs:1167
+msgid "less than 2 min left"
+msgstr "menos de 2 min restantes"
+
+#: crates/app/src/app.rs:1168
+msgid "taking longer than usual, still working…"
+msgstr "demorando mais que o normal, ainda trabalhando…"
+
+#: crates/app/src/app.rs:1217
+msgid "Remove the previous installation?"
+msgstr "Remover a instalação anterior?"
+
+#: crates/app/src/app.rs:1218
+msgid ""
+"{name} is still installed in its own container. Removing it frees disk "
+"space; your projects are not affected."
+msgstr ""
+"O {name} continua instalado no próprio container. Removê-lo libera espaço em "
+"disco; seus projetos não são afetados."
+
+#: crates/app/src/app.rs:1221
+msgid "Keep"
+msgstr "Manter"
+
+#: crates/app/src/app.rs:1222
+msgid "Remove"
+msgstr "Remover"
+
+#: crates/app/src/app.rs:1244
+msgid "Also delete projects and the Resolve database"
+msgstr "Apagar também projetos e o banco de dados do Resolve"
+
+#: crates/app/src/app.rs:1249
+msgid "Also remove"
+msgstr "Remover também o"
+
+#: crates/app/src/app.rs:1255
+msgid "Uninstall DaVinci Resolve?"
+msgstr "Desinstalar o DaVinci Resolve?"
+
+#: crates/app/src/app.rs:1256
+msgid ""
+"The container and menu entry are removed. Your projects stay unless you tick "
+"the option below."
+msgstr ""
+"O container e o atalho no menu serão removidos. Seus projetos ficam, a menos "
+"que você marque a opção abaixo."
+
+#: crates/app/src/app.rs:1259 crates/app/src/app.rs:1314
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: crates/app/src/app.rs:1260
+msgid "Uninstall"
+msgstr "Desinstalar"
+
+#: crates/app/src/app.rs:1299
+msgid "Podman is required"
+msgstr "O Podman é necessário"
+
+#: crates/app/src/app.rs:1300
+msgid ""
+"Install podman with your distribution's package manager, then open Vinci "
+"again."
+msgstr ""
+"Instale o podman pelo gerenciador de pacotes da sua distribuição e abra o "
+"Vinci novamente."
+
+#: crates/app/src/app.rs:1307
+msgid "Vinci needs to install some tools"
+msgstr "O Vinci precisa instalar algumas ferramentas"
+
+#: crates/app/src/app.rs:1310
+msgid "These tools run DaVinci Resolve in an isolated container:"
+msgstr "Estas ferramentas rodam o DaVinci Resolve em um container isolado:"
+
+#: crates/app/src/app.rs:1365
+msgid "Preparing"
+msgstr "Preparando"
+
+#: crates/app/src/app.rs:1427
+msgid "Could not install"
+msgstr "Não foi possível instalar o"
+
+#: crates/app/src/media.rs:36
+msgid "For editing: DNxHR HQ (every edition, large files)"
+msgstr "Para editar: DNxHR HQ (qualquer edição, arquivos grandes)"
+
+#: crates/app/src/media.rs:38
+msgid "For editing: ProRes 422 (large files)"
+msgstr "Para editar: ProRes 422 (arquivos grandes)"
+
+#: crates/app/src/media.rs:40
+msgid "For editing: fix audio only (Studio with NVIDIA)"
+msgstr "Para editar: corrigir só o áudio (Studio com NVIDIA)"
+
+#: crates/app/src/media.rs:42
+msgid "For publishing: MP4 H.264 (YouTube, web)"
+msgstr "Para publicar: MP4 H.264 (YouTube, web)"
+
+#: crates/app/src/media.rs:43
+msgid "For publishing: MP4 H.265 (smaller files)"
+msgstr "Para publicar: MP4 H.265 (arquivos menores)"
+
+#: crates/app/src/media.rs:44
+msgid "Custom"
+msgstr "Personalizado"
+
+#: crates/app/src/media.rs:55
+msgid ""
+"Files get about 10 times bigger than phone or camera videos: roughly 1 GB "
+"per minute in 1080p and 4 GB in 4K. Check your free space."
+msgstr ""
+"Os arquivos ficam cerca de 10 vezes maiores que vídeos de celular ou câmera: "
+"por volta de 1 GB por minuto em 1080p e 4 GB em 4K. Confira o espaço livre."
+
+#: crates/app/src/media.rs:59
+msgid ""
+"The video is copied as is; only the audio becomes uncompressed, so files "
+"grow a little."
+msgstr ""
+"O vídeo é copiado como está; só o áudio fica sem compressão, então os "
+"arquivos crescem um pouco."
+
+#: crates/app/src/media.rs:63
+msgid "Much smaller than the render from Resolve, with high quality."
+msgstr "Bem menor que a renderização do Resolve, com alta qualidade."
+
+#: crates/app/src/media.rs:67
+msgid "The smallest files: about half the size of H.264 at the same quality."
+msgstr ""
+"Os menores arquivos: cerca de metade do tamanho do H.264, com a mesma "
+"qualidade."
+
+#: crates/app/src/media.rs:198
+msgid "Prepare media"
+msgstr "Preparar mídia"
+
+#: crates/app/src/media.rs:199
+msgid ""
+"On Linux, DaVinci Resolve can't open AAC audio, and the free edition can't "
+"open H.264/H.265 video, which phones and most cameras record. Convert those "
+"files here before importing them, or turn your renders into MP4."
+msgstr ""
+"No Linux, o DaVinci Resolve não abre áudio AAC, e a edição gratuita não abre "
+"vídeo H.264/H.265, o formato de celulares e da maioria das câmeras. Converta "
+"esses arquivos aqui antes de importá-los, ou transforme suas renderizações "
+"em MP4."
+
+#: crates/app/src/media.rs:211
+msgid "Convert to"
+msgstr "Converter para"
+
+#: crates/app/src/media.rs:229 crates/app/src/media.rs:305
+msgid "Add files…"
+msgstr "Adicionar arquivos…"
+
+#: crates/app/src/media.rs:235
+msgid "Clear list"
+msgstr "Limpar lista"
+
+#: crates/app/src/media.rs:241
+msgid "Convert"
+msgstr "Converter"
+
+#: crates/app/src/media.rs:301
+msgid "Video and audio"
+msgstr "Vídeo e áudio"
+
+#: crates/app/src/media.rs:348
+msgid "Install DaVinci Resolve with Vinci first."
+msgstr "Instale o DaVinci Resolve pelo Vinci primeiro."
+
+#: crates/app/src/media.rs:451
+msgid "Show in folder"
+msgstr "Mostrar na pasta"
+
+#: crates/app/src/media.rs:470
+msgid "Waiting"
+msgstr "Aguardando"
+
+#: crates/app/src/media.rs:478
+msgid "Converting…"
+msgstr "Convertendo…"
+
+#: crates/app/src/media.rs:484
+msgid "Saved as"
+msgstr "Salvo como"
+
+#: crates/app/src/media.rs:490
+msgid "Failed:"
+msgstr "Falhou:"
+
+#: crates/app/src/messages.rs:23
 msgid "No compatible GPU found"
 msgstr "Nenhuma GPU compatível encontrada"
 
-#: crates/app/src/messages.rs:20
+#: crates/app/src/messages.rs:24
 msgid "DaVinci Resolve needs a GPU with CUDA, ROCm or OpenCL support."
 msgstr ""
 "O DaVinci Resolve precisa de uma GPU com suporte a CUDA, ROCm ou OpenCL."
 
-#: crates/app/src/messages.rs:23
+#: crates/app/src/messages.rs:27
 msgid "proprietary driver required"
 msgstr "driver proprietário necessário"
 
-#: crates/app/src/messages.rs:24
+#: crates/app/src/messages.rs:28
 msgid ""
 "Install the NVIDIA driver from your distribution, restart, then open Vinci "
 "again."
@@ -60,11 +485,11 @@ msgstr ""
 "Instale o driver da NVIDIA pela sua distribuição, reinicie e abra o Vinci "
 "novamente."
 
-#: crates/app/src/messages.rs:27
+#: crates/app/src/messages.rs:31
 msgid "experimental support"
 msgstr "suporte experimental"
 
-#: crates/app/src/messages.rs:28
+#: crates/app/src/messages.rs:32
 msgid ""
 "This GPU is not officially supported by ROCm. Vinci applies a known "
 "workaround, but Resolve may be unstable."
@@ -72,63 +497,63 @@ msgstr ""
 "Esta GPU não é suportada oficialmente pelo ROCm. O Vinci aplica uma solução "
 "conhecida, mas o Resolve pode ficar instável."
 
-#: crates/app/src/messages.rs:31
+#: crates/app/src/messages.rs:35
 msgid "unknown compatibility"
 msgstr "compatibilidade desconhecida"
 
-#: crates/app/src/messages.rs:32
+#: crates/app/src/messages.rs:36
 msgid ""
 "Vinci could not tell whether this GPU works with Resolve. You can try anyway."
 msgstr ""
 "O Vinci não conseguiu determinar se esta GPU funciona com o Resolve. Você "
 "pode tentar mesmo assim."
 
-#: crates/app/src/messages.rs:35
+#: crates/app/src/messages.rs:39
 msgid "not supported"
 msgstr "não suportada"
 
-#: crates/app/src/messages.rs:38
+#: crates/app/src/messages.rs:42
 msgid "AMD GPUs older than Vega are not supported by current ROCm."
 msgstr "GPUs AMD anteriores à Vega não são suportadas pelo ROCm atual."
 
-#: crates/app/src/messages.rs:41
+#: crates/app/src/messages.rs:45
 msgid "Intel GPUs older than 12th generation (Tiger Lake) are not supported."
 msgstr "GPUs Intel anteriores à 12ª geração (Tiger Lake) não são suportadas."
 
-#: crates/app/src/messages.rs:43
+#: crates/app/src/messages.rs:47
 msgid "This display adapter has no compute support."
 msgstr "Este adaptador de vídeo não tem suporte a processamento."
 
-#: crates/app/src/messages.rs:47
+#: crates/app/src/messages.rs:51
 msgid "Multiple GPUs detected"
 msgstr "Várias GPUs detectadas"
 
-#: crates/app/src/messages.rs:48
+#: crates/app/src/messages.rs:52
 msgid "Resolve will run on"
 msgstr "O Resolve vai usar a"
 
-#: crates/app/src/messages.rs:51
+#: crates/app/src/messages.rs:55
 msgid "Low memory"
 msgstr "Pouca memória"
 
-#: crates/app/src/messages.rs:52
+#: crates/app/src/messages.rs:56
 msgid "Blackmagic recommends 16 GiB or more. Large projects may be slow."
 msgstr ""
 "A Blackmagic recomenda 16 GiB ou mais. Projetos grandes podem ficar lentos."
 
-#: crates/app/src/messages.rs:55
+#: crates/app/src/messages.rs:59
 msgid "Very low memory"
 msgstr "Memória muito baixa"
 
-#: crates/app/src/messages.rs:56
+#: crates/app/src/messages.rs:60
 msgid "Resolve may close unexpectedly with less than 8 GiB."
 msgstr "O Resolve pode fechar inesperadamente com menos de 8 GiB."
 
-#: crates/app/src/messages.rs:59
+#: crates/app/src/messages.rs:63
 msgid "Little free space"
 msgstr "Pouco espaço livre"
 
-#: crates/app/src/messages.rs:60
+#: crates/app/src/messages.rs:64
 msgid ""
 "Installing works, but caches and renders need room. 40 GiB or more is "
 "recommended."
@@ -136,415 +561,287 @@ msgstr ""
 "A instalação funciona, mas cache e renderizações precisam de espaço. "
 "Recomenda-se 40 GiB ou mais."
 
-#: crates/app/src/messages.rs:63
+#: crates/app/src/messages.rs:67
 msgid "Not enough free space"
 msgstr "Espaço livre insuficiente"
 
-#: crates/app/src/messages.rs:64
+#: crates/app/src/messages.rs:68
 msgid "At least 12 GiB of free space is required."
 msgstr "São necessários pelo menos 12 GiB de espaço livre."
 
-msgid "A required program could not be started."
-msgstr "Um programa necessário não pôde ser iniciado."
-
-msgid "Adding the GPU driver repository"
-msgstr "Adicionando o repositório do driver da GPU"
-
-msgid "Applying compatibility fixes"
-msgstr "Aplicando correções de compatibilidade"
-
-msgid "Back"
-msgstr "Voltar"
-
-msgid "Cancel"
-msgstr "Cancelar"
-
-msgid "Checking the installation"
-msgstr "Conferindo a instalação"
-
-msgid "Choose file…"
-msgstr "Escolher arquivo…"
-
-msgid "Choose the installer"
-msgstr "Escolha o instalador"
-
-msgid "Could not install"
-msgstr "Não foi possível instalar o"
-
-msgid "Creating the container"
-msgstr "Criando o container"
-
-msgid "DaVinci Resolve installer"
-msgstr "Instalador do DaVinci Resolve"
-
-msgid "DaVinci Resolve is installed"
-msgstr "O DaVinci Resolve está instalado"
-
-msgid "Distrobox (installed in your user folder, no password)"
-msgstr "Distrobox (instalado na sua pasta de usuário, sem senha)"
-
-msgid "Download DaVinci Resolve for Linux from Blackmagic Design's website. Vinci finds the file in your Downloads folder automatically."
-msgstr "Baixe o DaVinci Resolve para Linux no site da Blackmagic Design. O Vinci encontra o arquivo na sua pasta Downloads automaticamente."
-
+#: crates/app/src/messages.rs:87
 msgid "Downloading the base system"
 msgstr "Baixando o sistema base"
 
-msgid "Extracting the installer"
-msgstr "Extraindo o instalador"
-
-msgid "Install"
-msgstr "Instalar"
-
-msgid "Install podman with your distribution's package manager, then open Vinci again."
-msgstr "Instale o podman pelo gerenciador de pacotes da sua distribuição e abra o Vinci novamente."
-
-msgid "Installation failed"
-msgstr "A instalação falhou"
-
-msgid "Installing DaVinci Resolve"
-msgstr "Instalando o DaVinci Resolve"
-
-msgid "Installing libraries and GPU support"
-msgstr "Instalando bibliotecas e suporte à GPU"
-
-msgid "It is in your applications menu. Your projects stay in your home folder."
-msgstr "Ele está no menu de aplicativos. Seus projetos ficam na sua pasta pessoal."
-
-msgid "No installer found in your Downloads folder yet."
-msgstr "Nenhum instalador encontrado na pasta Downloads ainda."
-
-msgid "Open DaVinci Resolve"
-msgstr "Abrir o DaVinci Resolve"
-
-msgid "Open download page"
-msgstr "Abrir página de download"
-
-msgid "Podman (container engine, asks for your password)"
-msgstr "Podman (motor de containers, pede sua senha)"
-
-msgid "Podman is required"
-msgstr "O Podman é necessário"
-
-msgid "Preparing"
-msgstr "Preparando"
-
-msgid "Recreating the container and trying again"
-msgstr "Recriando o container e tentando de novo"
-
-msgid "Removing the previous installation"
-msgstr "Removendo a instalação anterior"
-
-msgid "Resolve was installed, but Vinci could not save its settings."
-msgstr "O Resolve foi instalado, mas o Vinci não conseguiu salvar as configurações."
-
-msgid "Resolve was installed, but the menu entry could not be created."
-msgstr "O Resolve foi instalado, mas o atalho no menu não pôde ser criado."
-
-msgid "Setting up the container"
-msgstr "Configurando o container"
-
-msgid "These tools run DaVinci Resolve in an isolated container:"
-msgstr "Estas ferramentas rodam o DaVinci Resolve em um container isolado:"
-
-msgid "This step failed:"
-msgstr "Este passo falhou:"
-
-msgid "This takes a few minutes. You can keep using your computer."
-msgstr "Isso leva alguns minutos. Você pode continuar usando o computador."
-
-msgid "Try again"
-msgstr "Tentar novamente"
-
-msgid "Trying mirror"
-msgstr "Tentando o espelho"
-
-msgid "Vinci needs to install some tools"
-msgstr "O Vinci precisa instalar algumas ferramentas"
-
-msgid "Waiting for the download to finish in your Downloads folder…"
-msgstr "Aguardando o download terminar na pasta Downloads…"
-
-msgid "distrobox is missing"
-msgstr "o distrobox não foi encontrado"
-
-msgid "Copy diagnostic report"
-msgstr "Copiar relatório de diagnóstico"
-
-msgid "Diagnostic report copied. Paste it in your issue or message."
-msgstr "Relatório de diagnóstico copiado. Cole na sua issue ou mensagem."
-
-msgid "Update"
-msgstr "Atualizar"
-
-msgid "DaVinci Resolve {version} is available"
-msgstr "O DaVinci Resolve {version} está disponível"
-
-msgid "Version {version} has known problems. Keep your current version for now."
-msgstr "A versão {version} tem problemas conhecidos. Mantenha a versão atual por enquanto."
-
-msgid "Add files…"
-msgstr "Adicionar arquivos…"
-
-msgid "Clear list"
-msgstr "Limpar lista"
-
-msgid "Convert"
-msgstr "Converter"
-
-msgid "Convert to"
-msgstr "Converter para"
-
-msgid "Converting…"
-msgstr "Convertendo…"
-
-msgid "Custom"
-msgstr "Personalizado"
-
-msgid "Failed:"
-msgstr "Falhou:"
-
-msgid "For editing: DNxHR HQ (works in every edition)"
-msgstr "Para editar: DNxHR HQ (funciona em qualquer edição)"
-
-msgid "For editing: ProRes 422"
-msgstr "Para editar: ProRes 422"
-
-msgid "For editing: fix audio only (Studio with NVIDIA)"
-msgstr "Para editar: corrigir só o áudio (Studio com NVIDIA)"
-
-msgid "For publishing: MP4 H.264 (YouTube, web)"
-msgstr "Para publicar: MP4 H.264 (YouTube, web)"
-
-msgid "For publishing: MP4 H.265 (smaller files)"
-msgstr "Para publicar: MP4 H.265 (arquivos menores)"
-
-msgid "Install DaVinci Resolve with Vinci first."
-msgstr "Instale o DaVinci Resolve pelo Vinci primeiro."
-
-msgid "Installation"
-msgstr "Instalação"
-
-msgid "Media"
-msgstr "Mídia"
-
-msgid "On Linux, DaVinci Resolve can't open AAC audio, and the free edition can't open H.264/H.265 video, which phones and most cameras record. Convert those files here before importing them, or turn your renders into MP4."
-msgstr "No Linux, o DaVinci Resolve não abre áudio AAC, e a edição gratuita não abre vídeo H.264/H.265, o formato de celulares e da maioria das câmeras. Converta esses arquivos aqui antes de importá-los, ou transforme suas renderizações em MP4."
-
-msgid "Prepare media"
-msgstr "Preparar mídia"
-
-msgid "Saved as"
-msgstr "Salvo como"
-
-msgid "Video and audio"
-msgstr "Vídeo e áudio"
-
-msgid "Waiting"
-msgstr "Aguardando"
-
-msgid "Also delete projects and the Resolve database"
-msgstr "Apagar também projetos e o banco de dados do Resolve"
-
-msgid "Also remove"
-msgstr "Remover também o"
-
-msgid "DaVinci Resolve was uninstalled."
-msgstr "O DaVinci Resolve foi desinstalado."
-
-msgid "Installed"
-msgstr "Instalado"
-
-msgid "Open"
-msgstr "Abrir"
-
-msgid "The container and menu entry are removed. Your projects stay unless you tick the option below."
-msgstr "O container e o atalho no menu serão removidos. Seus projetos ficam, a menos que você marque a opção abaixo."
-
-msgid "Uninstall"
-msgstr "Desinstalar"
-
-msgid "Uninstall DaVinci Resolve?"
-msgstr "Desinstalar o DaVinci Resolve?"
-
-msgid "Uninstalled, with warnings:"
-msgstr "Desinstalado, com avisos:"
-
-msgid "Uninstall…"
-msgstr "Desinstalar…"
-
-msgid "DaVinci Resolve is missing from its container"
-msgstr "O DaVinci Resolve sumiu do container"
-
-msgid "It may have been removed by a system cleanup. Reinstall to get it back; your projects are safe."
-msgstr "Ele pode ter sido removido por uma limpeza do sistema. Reinstale para recuperá-lo; seus projetos estão seguros."
-
-msgid "Reinstall to fix it; your projects are safe."
-msgstr "Reinstale para corrigir; seus projetos estão seguros."
-
-msgid "Repair"
-msgstr "Reparar"
-
-msgid "The GPU is not visible to Resolve"
-msgstr "O Resolve não está enxergando a GPU"
-
-msgid "The Resolve container is missing"
-msgstr "O container do Resolve não foi encontrado"
-
-msgid "The menu entry is missing"
-msgstr "O atalho no menu sumiu"
-
-msgid "This usually happens after a driver update. Restart the computer; if it persists, copy the diagnostic report and ask for help."
-msgstr "Isso costuma acontecer depois de atualizar o driver. Reinicie o computador; se continuar, copie o relatório de diagnóstico e peça ajuda."
-
-msgid "Vinci can create it again."
-msgstr "O Vinci pode criá-lo de novo."
-
-msgid "Keep"
-msgstr "Manter"
-
-msgid "Remove"
-msgstr "Remover"
-
-msgid "Remove the previous installation?"
-msgstr "Remover a instalação anterior?"
-
-msgid "{name} is still installed in its own container. Removing it frees disk space; your projects are not affected."
-msgstr "O {name} continua instalado no próprio container. Removê-lo libera espaço em disco; seus projetos não são afetados."
-
-msgid "Could not restore:"
-msgstr "Não foi possível restaurar:"
-
-msgid "Go back to this version"
-msgstr "Voltar a esta versão"
-
-msgid "Restore point saved before the last update"
-msgstr "Ponto de restauração salvo antes da última atualização"
-
+#: crates/app/src/messages.rs:88
 msgid "Saving a restore point of the current version"
 msgstr "Salvando um ponto de restauração da versão atual"
 
-msgid "The previous version is back."
-msgstr "A versão anterior foi restaurada."
+#: crates/app/src/messages.rs:89
+msgid "Removing the previous installation"
+msgstr "Removendo a instalação anterior"
 
-msgid "Allows reinstalling without downloading again (3–12 GB)."
-msgstr "Permite reinstalar sem baixar de novo (3–12 GB)."
+#: crates/app/src/messages.rs:90
+msgid "Creating the container"
+msgstr "Criando o container"
 
-msgid "Applies to the menu entry the next time Vinci repairs or installs it."
-msgstr "Vale para o atalho na próxima vez que o Vinci o reparar ou instalar."
+#: crates/app/src/messages.rs:91
+msgid "Setting up the container"
+msgstr "Configurando o container"
 
-msgid "Automatic"
-msgstr "Automática"
+#: crates/app/src/messages.rs:92
+msgid "Adding the GPU driver repository"
+msgstr "Adicionando o repositório do driver da GPU"
 
-msgid "Choose folder…"
-msgstr "Escolher pasta…"
+#: crates/app/src/messages.rs:93
+msgid "Installing libraries and GPU support"
+msgstr "Instalando bibliotecas e suporte à GPU"
 
-msgid "Convert in the background"
-msgstr "Converter em segundo plano"
+#: crates/app/src/messages.rs:94
+msgid "Extracting the installer"
+msgstr "Extraindo o instalador"
 
-msgid "Export folder (convert renders to MP4)"
-msgstr "Pasta de exportação (converte renderizações para MP4)"
+#: crates/app/src/messages.rs:96
+msgid "Checking the installation"
+msgstr "Conferindo a instalação"
 
-msgid "Files placed in these folders are converted automatically."
-msgstr "Arquivos colocados nestas pastas são convertidos automaticamente."
+#: crates/app/src/messages.rs:97
+msgid "Applying compatibility fixes"
+msgstr "Aplicando correções de compatibilidade"
 
-msgid "GPU for DaVinci Resolve"
-msgstr "GPU do DaVinci Resolve"
+#: crates/app/src/messages.rs:98
+msgid "Installing podman"
+msgstr "Instalando o podman"
 
-msgid "General"
-msgstr "Geral"
+#: crates/app/src/messages.rs:99
+msgid "Installing distrobox"
+msgstr "Instalando o distrobox"
 
-msgid "Import folder (convert for editing)"
-msgstr "Pasta de importação (converte para editar)"
+#: crates/app/src/messages.rs:105
+msgid "Podman (container engine, asks for your password)"
+msgstr "Podman (motor de containers, pede sua senha)"
 
-msgid "Keep a restore point"
-msgstr "Manter um ponto de restauração"
+#: crates/app/src/messages.rs:107
+msgid "Distrobox (installed in your user folder, no password)"
+msgstr "Distrobox (instalado na sua pasta de usuário, sem senha)"
 
-msgid "Keep the installer"
-msgstr "Guardar o instalador"
+#: crates/app/src/messages.rs:117
+msgid "This step failed:"
+msgstr "Este passo falhou:"
 
-msgid "Keeps converting with Vinci closed, with an icon in the system tray."
-msgstr "Continua convertendo com o Vinci fechado, com um ícone na bandeja do sistema."
+#: crates/app/src/messages.rs:120
+msgid "A required program could not be started."
+msgstr "Um programa necessário não pôde ser iniciado."
 
-msgid "Language"
-msgstr "Idioma"
+#: crates/app/src/messages.rs:123
+msgid "Resolve was installed, but the menu entry could not be created."
+msgstr "O Resolve foi instalado, mas o atalho no menu não pôde ser criado."
 
+#: crates/app/src/messages.rs:126
+msgid "Resolve was installed, but Vinci could not save its settings."
+msgstr ""
+"O Resolve foi instalado, mas o Vinci não conseguiu salvar as configurações."
+
+#: crates/app/src/messages.rs:136
+msgid "The Resolve container is missing"
+msgstr "O container do Resolve não foi encontrado"
+
+#: crates/app/src/messages.rs:137
+msgid ""
+"It may have been removed by a system cleanup. Reinstall to get it back; your "
+"projects are safe."
+msgstr ""
+"Ele pode ter sido removido por uma limpeza do sistema. Reinstale para "
+"recuperá-lo; seus projetos estão seguros."
+
+#: crates/app/src/messages.rs:140
+msgid "DaVinci Resolve is missing from its container"
+msgstr "O DaVinci Resolve sumiu do container"
+
+#: crates/app/src/messages.rs:141
+msgid "Reinstall to fix it; your projects are safe."
+msgstr "Reinstale para corrigir; seus projetos estão seguros."
+
+#: crates/app/src/messages.rs:144
+msgid "The menu entry is missing"
+msgstr "O atalho no menu sumiu"
+
+#: crates/app/src/messages.rs:145
+msgid "Vinci can create it again."
+msgstr "O Vinci pode criá-lo de novo."
+
+#: crates/app/src/messages.rs:148
+msgid "The GPU is not visible to Resolve"
+msgstr "O Resolve não está enxergando a GPU"
+
+#: crates/app/src/messages.rs:149
+msgid ""
+"This usually happens after a driver update. Restart the computer; if it "
+"persists, copy the diagnostic report and ask for help."
+msgstr ""
+"Isso costuma acontecer depois de atualizar o driver. Reinicie o computador; "
+"se continuar, copie o relatório de diagnóstico e peça ajuda."
+
+#: crates/app/src/preferences.rs:39
 msgid "Off"
 msgstr "Desativada"
 
-msgid "Preferences"
-msgstr "Preferências"
+#: crates/app/src/preferences.rs:48 crates/app/src/preferences.rs:70
+msgid "Choose folder…"
+msgstr "Escolher pasta…"
 
-msgid "Saves the current version before each update so you can go back (5–10 GB)."
-msgstr "Salva a versão atual antes de cada atualização para você poder voltar (5–10 GB)."
+#: crates/app/src/preferences.rs:103
+msgid "No terminal app found on this computer."
+msgstr "Nenhum terminal encontrado neste computador."
 
+#: crates/app/src/preferences.rs:115
+msgid "Advanced"
+msgstr "Avançado"
+
+#: crates/app/src/preferences.rs:133
+msgid "Open a terminal in the container"
+msgstr "Abrir um terminal no container"
+
+#: crates/app/src/preferences.rs:134
+msgid ""
+"A shell inside DaVinci Resolve's container, for troubleshooting or "
+"installing extra plugins. Use sudo for system changes."
+msgstr ""
+"Um shell dentro do container do DaVinci Resolve, para investigar problemas "
+"ou instalar plugins extras. Use sudo para mudanças no sistema."
+
+#: crates/app/src/preferences.rs:152
+msgid "Open the installation folder"
+msgstr "Abrir a pasta da instalação"
+
+#: crates/app/src/preferences.rs:153
+msgid ""
+"Projects, database, settings, LUTs and logs of DaVinci Resolve ({path}). The "
+"program itself is inside the container, in /opt/resolve: reach it with the "
+"terminal above."
+msgstr ""
+"Projetos, banco de dados, configurações, LUTs e logs do DaVinci Resolve "
+"({path}). O programa em si fica dentro do container, em /opt/resolve: acesse "
+"pelo terminal acima."
+
+#: crates/app/src/preferences.rs:175
+msgid "General"
+msgstr "Geral"
+
+#: crates/app/src/preferences.rs:177
 msgid "System language"
 msgstr "Idioma do sistema"
 
+#: crates/app/src/preferences.rs:187
+msgid "Language"
+msgstr "Idioma"
+
+#: crates/app/src/preferences.rs:188
 msgid "Takes effect the next time Vinci opens."
 msgstr "Vale a partir da próxima vez que o Vinci abrir."
 
+#: crates/app/src/preferences.rs:205
+msgid "Automatic"
+msgstr "Automática"
+
+#: crates/app/src/preferences.rs:219
+msgid "GPU for DaVinci Resolve"
+msgstr "GPU do DaVinci Resolve"
+
+#: crates/app/src/preferences.rs:221
+msgid "Applies to the menu entry the next time Vinci repairs or installs it."
+msgstr "Vale para o atalho na próxima vez que o Vinci o reparar ou instalar."
+
+#: crates/app/src/preferences.rs:240
 msgid "Updates and disk space"
 msgstr "Atualizações e espaço em disco"
 
+#: crates/app/src/preferences.rs:260
+msgid "Keep a restore point"
+msgstr "Manter um ponto de restauração"
+
+#: crates/app/src/preferences.rs:261
+msgid ""
+"Saves the current version before each update so you can go back (5–10 GB)."
+msgstr ""
+"Salva a versão atual antes de cada atualização para você poder voltar (5–10 "
+"GB)."
+
+#: crates/app/src/preferences.rs:266
+msgid "Keep the installer"
+msgstr "Guardar o instalador"
+
+#: crates/app/src/preferences.rs:267
+msgid "Allows reinstalling without downloading again (3–12 GB)."
+msgstr "Permite reinstalar sem baixar de novo (3–12 GB)."
+
+#: crates/app/src/preferences.rs:273
 msgid "Watch folders"
 msgstr "Pastas monitoradas"
 
-msgid "Conversion failed"
-msgstr "A conversão falhou"
+#: crates/app/src/preferences.rs:275
+msgid "Files placed in these folders are converted automatically."
+msgstr "Arquivos colocados nestas pastas são convertidos automaticamente."
 
-msgid "Conversion finished"
-msgstr "Conversão concluída"
+#: crates/app/src/preferences.rs:279
+msgid "Convert in the background"
+msgstr "Converter em segundo plano"
 
-msgid "Converting"
-msgstr "Convertendo"
+#: crates/app/src/preferences.rs:280
+msgid "Keeps converting with Vinci closed, with an icon in the system tray."
+msgstr ""
+"Continua convertendo com o Vinci fechado, com um ícone na bandeja do sistema."
 
+#: crates/app/src/preferences.rs:287
+msgid "Import folder (convert for editing)"
+msgstr "Pasta de importação (converte para editar)"
+
+#: crates/app/src/preferences.rs:295
+msgid "Export folder (convert renders to MP4)"
+msgstr "Pasta de exportação (converte renderizações para MP4)"
+
+#: crates/app/src/service.rs:55
 msgid "Open Vinci"
 msgstr "Abrir o Vinci"
 
-msgid "Pause conversions"
-msgstr "Pausar conversões"
-
-msgid "Paused"
-msgstr "Pausado"
-
-msgid "Quit background service"
-msgstr "Encerrar o serviço em segundo plano"
-
+#: crates/app/src/service.rs:66
 msgid "Resume conversions"
 msgstr "Retomar conversões"
 
-msgid "Waiting for DaVinci Resolve to be installed"
-msgstr "Aguardando a instalação do DaVinci Resolve"
+#: crates/app/src/service.rs:68
+msgid "Pause conversions"
+msgstr "Pausar conversões"
 
+#: crates/app/src/service.rs:77
+msgid "Quit background service"
+msgstr "Encerrar o serviço em segundo plano"
+
+#: crates/app/src/service.rs:136 crates/app/src/service.rs:211
 msgid "Watching your folders"
 msgstr "Monitorando suas pastas"
 
-msgid "Blackmagic USB devices"
-msgstr "Dispositivos USB da Blackmagic"
+#: crates/app/src/service.rs:160
+msgid "Paused"
+msgstr "Pausado"
 
-msgid "Could not set up USB devices:"
-msgstr "Não foi possível configurar os dispositivos USB:"
+#: crates/app/src/service.rs:165
+msgid "Waiting for DaVinci Resolve to be installed"
+msgstr "Aguardando a instalação do DaVinci Resolve"
 
-msgid "Needed for the Studio USB dongle, Speed Editor and panels (asks for your password)"
-msgstr "Necessário para o dongle USB do Studio, o Speed Editor e os painéis (pede sua senha)"
+#: crates/app/src/service.rs:190 crates/app/src/service.rs:193
+msgid "Converting"
+msgstr "Convertendo"
 
-msgid "Set up"
-msgstr "Configurar"
+#: crates/app/src/service.rs:198
+msgid "Conversion finished"
+msgstr "Conversão concluída"
 
-msgid "Set up: Studio dongle, Speed Editor and panels"
-msgstr "Configurado: dongle do Studio, Speed Editor e painéis"
+#: crates/app/src/service.rs:204
+msgid "Conversion failed"
+msgstr "A conversão falhou"
 
-msgid "USB devices set up. Reconnect the dongle or panel if it was already plugged in."
-msgstr "Dispositivos USB configurados. Reconecte o dongle ou o painel se já estava conectado."
-
-msgid "Update or reinstall"
-msgstr "Atualizar ou reinstalar"
-
-msgid "about {minutes} min left"
-msgstr "cerca de {minutes} min restantes"
-
-msgid "less than 2 min left"
-msgstr "menos de 2 min restantes"
-
-msgid "taking longer than usual, still working…"
-msgstr "demorando mais que o normal, ainda trabalhando…"
+#~ msgid ""
+#~ "No terminal app found. Install Konsole, GNOME Terminal or another one."
+#~ msgstr ""
+#~ "Nenhum terminal encontrado. Instale o Konsole, o Terminal do GNOME ou "
+#~ "outro."

@@ -6,9 +6,13 @@ use relm4::adw::prelude::*;
 use relm4::gtk;
 use relm4::gtk::gio;
 use rli_core::gpu::Gpu;
+use rli_core::host::HostRunner;
+use rli_core::recipe::Recipe;
 use rli_core::settings::{self, Settings, LANGUAGES};
+use rli_core::state::Installation;
+use rli_core::{terminal, tools};
 use std::cell::RefCell;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::rc::Rc;
 
 fn save(s: &Settings) {
@@ -78,8 +82,90 @@ fn folder_row(
     row
 }
 
+/// Opens `dir` in the file manager (through the portal inside the Flatpak).
+fn open_folder(dir: &Path, window: Option<&gtk::Window>) {
+    gtk::FileLauncher::new(Some(&gio::File::for_path(dir))).launch(
+        window,
+        None::<&gio::Cancellable>,
+        |_| {},
+    );
+}
+
+/// A shell inside the Resolve container, in the user's terminal emulator.
+fn open_terminal(container: &str) -> Result<(), String> {
+    let runner = HostRunner::new();
+    let dbx = tools::detect(&runner, &Recipe::bundled(), &rli_core::state::home())
+        .distrobox
+        .executable()
+        .ok_or_else(|| tr("distrobox is missing"))?;
+    let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
+    let argv = terminal::find(&runner, &desktop, &terminal::shell_in(&dbx, container))
+        .ok_or_else(|| tr("No terminal app found on this computer."))?;
+    runner.spawn_detached(&argv).map_err(|e| e.to_string())
+}
+
+/// Tools for advanced users: a shell in the container and the folder with Resolve's data.
+fn advanced_group(
+    installed: Option<Installation>,
+    dialog: &adw::PreferencesDialog,
+    window: Option<gtk::Window>,
+) -> adw::PreferencesGroup {
+    let group = adw::PreferencesGroup::builder()
+        .title(tr("Advanced"))
+        .build();
+    let row_with_button = |title: String, subtitle: String, icon: &str| {
+        let row = adw::ActionRow::builder()
+            .title(title)
+            .subtitle(subtitle)
+            .subtitle_lines(0)
+            .activatable(true)
+            .build();
+        let b = gtk::Button::from_icon_name(icon);
+        b.set_valign(gtk::Align::Center);
+        b.add_css_class("flat");
+        row.add_suffix(&b);
+        row.set_activatable_widget(Some(&b));
+        (row, b)
+    };
+
+    let (term_row, term) = row_with_button(
+        tr("Open a terminal in the container"),
+        tr("A shell inside DaVinci Resolve's container, for troubleshooting or installing extra plugins. Use sudo for system changes."),
+        "utilities-terminal-symbolic",
+    );
+    term_row.set_sensitive(installed.is_some());
+    term.connect_clicked({
+        let (dialog, container) = (dialog.clone(), installed.map(|i| i.container));
+        move |_| {
+            if let Some(c) = &container {
+                if let Err(e) = open_terminal(c) {
+                    dialog.add_toast(adw::Toast::new(&e));
+                }
+            }
+        }
+    });
+    group.add(&term_row);
+
+    let data = rli_core::uninstall::resolve_data_dir(&rli_core::state::home());
+    let (folder_row, folder) = row_with_button(
+        tr("Open the installation folder"),
+        tr("Projects, database, settings, LUTs and logs of DaVinci Resolve ({path}). The program itself is inside the container, in /opt/resolve: reach it with the terminal above.")
+            .replace("{path}", &data.display().to_string()),
+        "folder-open-symbolic",
+    );
+    folder_row.set_sensitive(data.exists());
+    folder.connect_clicked(move |_| open_folder(&data, window.as_ref()));
+    group.add(&folder_row);
+    group
+}
+
 /// Shows the dialog. `on_change` runs after any setting is saved.
-pub fn present(parent: &impl IsA<gtk::Widget>, gpus: &[Gpu], on_change: impl Fn() + 'static) {
+pub fn present(
+    parent: &impl IsA<gtk::Widget>,
+    gpus: &[Gpu],
+    installed: Option<Installation>,
+    on_change: impl Fn() + 'static,
+) {
     let store = Rc::new(RefCell::new(Settings::load(&Settings::default_path())));
     let on_change = Rc::new(on_change);
     let window = parent.root().and_downcast::<gtk::Window>();
@@ -210,14 +296,15 @@ pub fn present(parent: &impl IsA<gtk::Widget>, gpus: &[Gpu], on_change: impl Fn(
         export_default,
         store.clone(),
         |s, v| s.watch_export = v,
-        window,
+        window.clone(),
     ));
 
+    let dialog = adw::PreferencesDialog::new();
     let page = adw::PreferencesPage::new();
     page.add(&general);
     page.add(&safety);
     page.add(&media);
-    let dialog = adw::PreferencesDialog::new();
+    page.add(&advanced_group(installed, &dialog, window));
     dialog.set_title(&tr("Preferences"));
     dialog.add(&page);
     dialog.present(Some(parent));

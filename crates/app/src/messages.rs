@@ -95,6 +95,8 @@ pub fn step(kind: StepKind) -> String {
         StepKind::InstallResolve => tr("Installing DaVinci Resolve"),
         StepKind::Verify => tr("Checking the installation"),
         StepKind::RemoveConflictingLibs => tr("Applying compatibility fixes"),
+        StepKind::InstallPodman => tr("Installing podman"),
+        StepKind::InstallDistrobox => tr("Installing distrobox"),
     }
 }
 

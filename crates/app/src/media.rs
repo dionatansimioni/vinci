@@ -33,15 +33,40 @@ pub const CHOICES: [Choice; 5] = [
 pub fn choice_label(c: Choice) -> String {
     match c {
         Choice::Import(ImportPreset::DnxhrHq) => {
-            tr("For editing: DNxHR HQ (works in every edition)")
+            tr("For editing: DNxHR HQ (every edition, large files)")
         }
-        Choice::Import(ImportPreset::Prores422) => tr("For editing: ProRes 422"),
+        Choice::Import(ImportPreset::Prores422) => tr("For editing: ProRes 422 (large files)"),
         Choice::Import(ImportPreset::AudioOnly) => {
             tr("For editing: fix audio only (Studio with NVIDIA)")
         }
         Choice::Export(ExportPreset::Web) => tr("For publishing: MP4 H.264 (YouTube, web)"),
         Choice::Export(ExportPreset::Archive) => tr("For publishing: MP4 H.265 (smaller files)"),
         Choice::Export(ExportPreset::Custom(_)) => tr("Custom"),
+    }
+}
+
+/// How the output size compares with the input, shown under the drop-down. `true` when
+/// the files get much bigger, so the note is shown as a warning.
+pub fn size_note(c: Choice) -> (String, bool) {
+    match c {
+        // DNxHR HQ ≈ 180 Mbit/s and ProRes 422 ≈ 150 Mbit/s at 1080p30, against the
+        // 10–20 Mbit/s of phone and camera H.264.
+        Choice::Import(ImportPreset::DnxhrHq | ImportPreset::Prores422) => (
+            tr("Files get about 10 times bigger than phone or camera videos: roughly 1 GB per minute in 1080p and 4 GB in 4K. Check your free space."),
+            true,
+        ),
+        Choice::Import(ImportPreset::AudioOnly) => (
+            tr("The video is copied as is; only the audio becomes uncompressed, so files grow a little."),
+            false,
+        ),
+        Choice::Export(ExportPreset::Web) => (
+            tr("Much smaller than the render from Resolve, with high quality."),
+            false,
+        ),
+        Choice::Export(ExportPreset::Archive | ExportPreset::Custom(_)) => (
+            tr("The smallest files: about half the size of H.264 at the same quality."),
+            false,
+        ),
     }
 }
 
@@ -73,6 +98,8 @@ pub enum MediaMsg {
     Choose(usize),
     Start,
     Clear,
+    /// Opens the file manager at the converted file of job `i`.
+    Reveal(usize),
 }
 
 #[derive(Debug)]
@@ -86,6 +113,9 @@ pub struct MediaWidgets {
     list: gtk::ListBox,
     rows: Vec<adw::ActionRow>,
     bars: Vec<gtk::ProgressBar>,
+    reveal: Vec<gtk::Button>,
+    size_row: adw::ActionRow,
+    size_icon: gtk::Image,
     start: gtk::Button,
     empty: adw::StatusPage,
     content: gtk::Box,
@@ -181,8 +211,14 @@ impl Component for Media {
         let preset_row = adw::ActionRow::builder().title(tr("Convert to")).build();
         dropdown.set_valign(gtk::Align::Center);
         preset_row.add_suffix(&dropdown);
+        // Its own row: beside the drop-down the note was squeezed into a thin column.
+        let size_row = adw::ActionRow::builder().title_lines(0).build();
+        size_row.add_css_class("dim-label");
+        let size_icon = gtk::Image::new();
+        size_row.add_prefix(&size_icon);
         let preset_group = adw::PreferencesGroup::new();
         preset_group.add(&preset_row);
+        preset_group.add(&size_row);
 
         let list = gtk::ListBox::builder()
             .selection_mode(gtk::SelectionMode::None)
@@ -244,6 +280,9 @@ impl Component for Media {
             list,
             rows: Vec::new(),
             bars: Vec::new(),
+            reveal: Vec::new(),
+            size_row,
+            size_icon,
             start,
             empty,
             content,
@@ -288,6 +327,16 @@ impl Component for Media {
                 }
             }
             MediaMsg::Choose(i) => self.choice = i.min(CHOICES.len() - 1),
+            MediaMsg::Reveal(i) => {
+                if let Some(Status::Done(p)) = self.jobs.get(i).map(|j| &j.status) {
+                    let window = root.root().and_downcast::<gtk::Window>();
+                    gtk::FileLauncher::new(Some(&gio::File::for_path(p))).open_containing_folder(
+                        window.as_ref(),
+                        None::<&gio::Cancellable>,
+                        |_| {},
+                    );
+                }
+            }
             MediaMsg::Clear => {
                 if !self.running {
                     self.jobs.clear();
@@ -374,13 +423,23 @@ impl Component for Media {
         w.empty.set_visible(!has_jobs);
         w.content.set_visible(true);
         w.start.set_sensitive(has_jobs && !self.running);
+        let (note, bigger) = size_note(CHOICES[self.choice]);
+        w.size_row.set_title(&note);
+        w.size_row
+            .set_css_classes(if bigger { &["warning"] } else { &["dim-label"] });
+        w.size_icon.set_icon_name(Some(if bigger {
+            "dialog-warning-symbolic"
+        } else {
+            "dialog-information-symbolic"
+        }));
         // Rebuild only when the list length changed; otherwise update in place.
         if w.rows.len() != self.jobs.len() {
             for r in w.rows.drain(..) {
                 w.list.remove(&r);
             }
             w.bars.clear();
-            for j in &self.jobs {
+            w.reveal.clear();
+            for (i, j) in self.jobs.iter().enumerate() {
                 let row = adw::ActionRow::builder()
                     .title(j.input.file_name().unwrap_or_default().to_string_lossy())
                     .build();
@@ -389,12 +448,23 @@ impl Component for Media {
                     .width_request(120)
                     .build();
                 row.add_suffix(&bar);
+                let reveal = gtk::Button::from_icon_name("folder-open-symbolic");
+                reveal.set_tooltip_text(Some(&tr("Show in folder")));
+                reveal.set_valign(gtk::Align::Center);
+                reveal.add_css_class("flat");
+                let sender = _sender.clone();
+                reveal.connect_clicked(move |_| sender.input(MediaMsg::Reveal(i)));
+                row.add_suffix(&reveal);
                 w.list.append(&row);
                 w.rows.push(row);
                 w.bars.push(bar);
+                w.reveal.push(reveal);
             }
         }
         w.list.set_visible(has_jobs);
+        for (j, reveal) in self.jobs.iter().zip(&w.reveal) {
+            reveal.set_visible(matches!(j.status, Status::Done(_)));
+        }
         for ((j, row), bar) in self.jobs.iter().zip(&w.rows).zip(&w.bars) {
             match &j.status {
                 Status::Waiting => {
@@ -422,6 +492,26 @@ impl Component for Media {
                     bar.set_fraction(0.0);
                 }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn warns_about_the_presets_that_grow_files() {
+        let growing: Vec<Choice> = CHOICES.into_iter().filter(|c| size_note(*c).1).collect();
+        assert_eq!(
+            growing,
+            [
+                Choice::Import(ImportPreset::DnxhrHq),
+                Choice::Import(ImportPreset::Prores422)
+            ]
+        );
+        for c in CHOICES {
+            assert!(!size_note(c).0.is_empty(), "{c:?} needs a size note");
         }
     }
 }

@@ -1,4 +1,9 @@
+crates/app/src/about.rs
 crates/app/src/app.rs
+crates/app/src/desktop.rs
 crates/app/src/i18n.rs
 crates/app/src/main.rs
+crates/app/src/media.rs
 crates/app/src/messages.rs
+crates/app/src/preferences.rs
+crates/app/src/service.rs

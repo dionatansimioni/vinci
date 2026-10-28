@@ -50,6 +50,8 @@ impl Page {
 /// What the progress page shows; the bar itself is computed from it on every tick.
 struct Progress {
     plan: Vec<rli_core::container::StepKind>,
+    /// Host tool steps at the front of `plan`; the container plan's indices start after.
+    host_steps: usize,
     index: usize,
     step: String,
     activity: String,
@@ -63,6 +65,7 @@ impl Progress {
         let now = std::time::Instant::now();
         Self {
             plan: Vec::new(),
+            host_steps: 0,
             index: 0,
             step,
             activity: String::new(),
@@ -127,11 +130,13 @@ pub enum Msg {
     FileChosen(PathBuf),
     OpenDownloadPage,
     Install(usize),
+    SetupHost(Vec<Action>, InstallerFile),
     StartInstall(InstallerFile),
     OpenResolve,
     AskUninstall,
     SetupUsb,
     Preferences,
+    About,
     SettingsChanged,
     Restore,
     RemoveContainer(String),
@@ -150,7 +155,7 @@ pub enum Msg {
 pub enum Cmd {
     Downloads(Vec<InstallerFile>),
     Progress(Event),
-    HostReady,
+    HostStep(usize, rli_core::container::StepKind),
     Finished(Result<Outcome, (String, String)>),
     Update(UpdateInfo),
     Uninstalled(rli_core::uninstall::Summary),
@@ -240,6 +245,15 @@ fn button(label: &str, classes: &[&str]) -> gtk::Button {
 fn page_box(children: &[&gtk::Widget]) -> gtk::ScrolledWindow {
     let content = gtk::Box::new(gtk::Orientation::Vertical, 0);
     for c in children {
+        // A status page scrolls on its own, so its minimum height is tiny and in a short
+        // window its title covered the rows below. Let the whole page scroll instead.
+        if let Some(inner) = c
+            .downcast_ref::<adw::StatusPage>()
+            .and_then(|s| s.first_child())
+            .and_downcast::<gtk::ScrolledWindow>()
+        {
+            inner.set_vscrollbar_policy(gtk::PolicyType::Never);
+        }
         content.append(*c);
     }
     let clamp = adw::Clamp::builder()
@@ -327,8 +341,10 @@ impl Component for App {
     type Widgets = Widgets;
 
     fn init_root() -> Self::Root {
+        gtk::Window::set_default_icon_name(crate::APP_ID);
         adw::ApplicationWindow::builder()
             .title("Vinci")
+            .icon_name(crate::APP_ID)
             .default_width(720)
             .default_height(680)
             .build()
@@ -539,13 +555,25 @@ impl Component for App {
             .policy(adw::ViewSwitcherPolicy::Wide)
             .build();
         let header = adw::HeaderBar::new();
-        let prefs = gtk::Button::from_icon_name("emblem-system-symbolic");
-        prefs.set_tooltip_text(Some(&tr("Preferences")));
-        prefs.connect_clicked({
+        for (name, msg) in [
+            ("preferences", (|| Msg::Preferences) as fn() -> Msg),
+            ("about", || Msg::About),
+        ] {
+            let action = gio::SimpleAction::new(name, None);
             let sender = sender.clone();
-            move |_| sender.input(Msg::Preferences)
-        });
-        header.pack_end(&prefs);
+            action.connect_activate(move |_, _| sender.input(msg()));
+            root.add_action(&action);
+        }
+        let menu = gio::Menu::new();
+        menu.append(Some(&tr("Preferences")), Some("win.preferences"));
+        menu.append(Some(&tr("About Vinci")), Some("win.about"));
+        let menu_button = gtk::MenuButton::builder()
+            .icon_name("open-menu-symbolic")
+            .menu_model(&menu)
+            .tooltip_text(tr("Main menu"))
+            .primary(true)
+            .build();
+        header.pack_end(&menu_button);
         header.set_title_widget(Some(&switcher));
         let toolbar = adw::ToolbarView::new();
         toolbar.add_top_bar(&header);
@@ -568,6 +596,14 @@ impl Component for App {
         }
         sender.input(Msg::RunHealth);
         sync_background_service();
+        crate::desktop::force_window_buttons();
+        if !std::path::Path::new("/.flatpak-info").exists() {
+            let appimage = std::env::var("APPIMAGE").ok();
+            let _ = crate::desktop::integrate(
+                &integrate::data_home(&state::home()),
+                appimage.as_deref(),
+            );
+        }
         let mut widgets = Widgets {
             installed_group,
             installed_row,
@@ -655,10 +691,12 @@ impl Component for App {
             Msg::AskUninstall => self.ask_uninstall(&sender, root),
             Msg::Preferences => {
                 let input = sender.input_sender().clone();
-                crate::preferences::present(root, &self.gpus, move || {
+                crate::preferences::present(root, &self.gpus, self.installed.clone(), move || {
                     input.emit(Msg::SettingsChanged)
                 });
             }
+            Msg::About => crate::about::present(root, self.diagnostic_report()),
+            Msg::SetupHost(actions, file) => self.setup_host(actions, file, &sender),
             Msg::SettingsChanged => {
                 apply_gpu_choice(&mut self.report, &self.gpus);
                 sync_background_service();
@@ -854,6 +892,12 @@ impl Component for App {
                         let _ = runner.spawn_detached(&argv);
                     }
                 }
+                // From the "installed" page, go back to the overview of the installation
+                // (uninstall, restore, USB…) without restarting Vinci.
+                if self.page == Page::Done {
+                    self.page = Page::Check;
+                    sender.input(Msg::RunHealth);
+                }
             }
         }
     }
@@ -864,9 +908,23 @@ impl Component for App {
                 self.installers = found;
                 self.watching = None;
             }
-            Cmd::Progress(Event::Plan(plan)) => self.progress.plan = plan,
-            Cmd::Progress(Event::Started { index, kind, .. }) => {
+            Cmd::Progress(Event::Plan(plan)) => {
+                let p = &mut self.progress;
+                p.plan.truncate(p.host_steps);
+                p.plan.extend(plan);
+            }
+            Cmd::HostStep(index, kind) => {
                 self.progress.index = index;
+                self.progress.step = messages::step(kind);
+                self.progress.step_started = std::time::Instant::now();
+                self.progress.activity = if kind == rli_core::container::StepKind::InstallPodman {
+                    tr("Type your password in the window that opened")
+                } else {
+                    String::new()
+                };
+            }
+            Cmd::Progress(Event::Started { index, kind, .. }) => {
+                self.progress.index = self.progress.host_steps + index;
                 self.progress.step = messages::step(kind);
                 self.progress.step_started = std::time::Instant::now();
                 self.progress.activity.clear();
@@ -884,7 +942,6 @@ impl Component for App {
                 self.progress.step = tr("Recreating the container and trying again");
             }
             Cmd::Progress(Event::Finished { .. }) => {}
-            Cmd::HostReady => {}
             Cmd::Update(info) => self.update = Some(info),
             Cmd::Health(problems) => self.problems = problems,
             Cmd::UsbConfigured(Ok(_)) => {
@@ -1262,26 +1319,48 @@ impl App {
             if response != "install" {
                 return;
             }
-            let actions = actions.clone();
-            let file = file.clone();
-            let input = sender.input_sender().clone();
-            sender.spawn_command(move |out| match run_host_actions(&actions) {
-                Ok(()) => {
-                    let _ = out.send(Cmd::HostReady);
-                    input.emit(Msg::StartInstall(file));
-                }
-                Err(e) => {
-                    let _ = out.send(Cmd::Finished(Err(e)));
-                }
-            });
+            sender.input(Msg::SetupHost(actions.clone(), file.clone()));
         });
         dialog.present(Some(root));
     }
 
-    fn start_install(&mut self, file: InstallerFile, sender: &ComponentSender<Self>) {
-        let Some(gpu) = self.chosen_gpu().cloned() else {
-            return;
-        };
+    /// Installs podman/distrobox with the progress page already showing, then goes on to
+    /// the Resolve install on the same bar.
+    fn setup_host(
+        &mut self,
+        actions: Vec<Action>,
+        file: InstallerFile,
+        sender: &ComponentSender<Self>,
+    ) {
+        self.show_progress(sender);
+        let kinds: Vec<_> = actions.iter().filter_map(Action::step_kind).collect();
+        self.progress.host_steps = kinds.len();
+        self.progress.plan = kinds;
+        let input = sender.input_sender().clone();
+        sender.spawn_command(move |out| {
+            let mut last_line = std::time::Instant::now() - Duration::from_secs(1);
+            let result = run_host_actions(&actions, &mut |e| match e {
+                HostEvent::Started(i, kind) => {
+                    let _ = out.send(Cmd::HostStep(i, kind));
+                }
+                HostEvent::Output(line) => {
+                    if last_line.elapsed() >= Duration::from_millis(200) {
+                        last_line = std::time::Instant::now();
+                        let _ = out.send(Cmd::Progress(Event::Output(line)));
+                    }
+                }
+            });
+            match result {
+                Ok(()) => input.emit(Msg::StartInstall(file)),
+                Err(e) => {
+                    let _ = out.send(Cmd::Finished(Err(e)));
+                }
+            }
+        });
+    }
+
+    /// Switches to the progress page and starts the once-a-second redraw.
+    fn show_progress(&mut self, sender: &ComponentSender<Self>) {
         self.page = Page::Progress;
         self.progress = Progress::new(tr("Preparing"));
         self.progress.running.store(true, Ordering::Relaxed);
@@ -1296,6 +1375,16 @@ impl App {
                 gtk::glib::ControlFlow::Break
             }
         });
+    }
+
+    fn start_install(&mut self, file: InstallerFile, sender: &ComponentSender<Self>) {
+        let Some(gpu) = self.chosen_gpu().cloned() else {
+            return;
+        };
+        // Already on the progress page when host tools were just installed.
+        if !self.progress.running.load(Ordering::Relaxed) {
+            self.show_progress(sender);
+        }
         let gpus = self.gpus.clone();
         sender.spawn_command(move |out| {
             let result = install_blocking(&file, &gpus, &gpu, &out);
@@ -1304,17 +1393,30 @@ impl App {
     }
 }
 
-fn run_host_actions(actions: &[Action]) -> Result<(), (String, String)> {
+enum HostEvent {
+    Started(usize, rli_core::container::StepKind),
+    Output(String),
+}
+
+fn run_host_actions(
+    actions: &[Action],
+    on: &mut dyn FnMut(HostEvent),
+) -> Result<(), (String, String)> {
     let runner = HostRunner::new();
     let path = State::default_path();
     let mut st = State::load(&path).unwrap_or_default();
-    for a in actions {
+    let steps = actions.iter().filter_map(|a| Some((a, a.step_kind()?)));
+    for (i, (a, kind)) in steps.enumerate() {
+        on(HostEvent::Started(i, kind));
+        let mut line = |l: &str| on(HostEvent::Output(l.to_string()));
         let (out, tool, source) = match a {
-            Action::InstallPodman { argv, .. } => {
-                (runner.run_root(argv), "podman", ToolSource::PackageManager)
-            }
+            Action::InstallPodman { argv, .. } => (
+                runner.run_root_streaming(argv, &mut line),
+                "podman",
+                ToolSource::PackageManager,
+            ),
             Action::InstallDistrobox { argv, prefix } => (
-                runner.run(argv),
+                runner.run_streaming(argv, &mut line),
                 "distrobox",
                 ToolSource::UserLocal {
                     prefix: prefix.clone(),
