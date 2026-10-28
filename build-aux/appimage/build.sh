@@ -16,16 +16,23 @@ exec "$ENGINE" run --rm --network host -v "$PWD:/src" -w /src docker.io/library/
 export DEBIAN_FRONTEND=noninteractive
 apt-get update --error-on=any -qq
 apt-get install -y -qq --no-install-recommends ca-certificates curl build-essential pkg-config \
-    libgtk-4-dev libadwaita-1-dev gettext file zsync librsvg2-common >/dev/null
+    libgtk-4-dev libadwaita-1-dev gettext file zsync librsvg2-common adwaita-icon-theme >/dev/null
 curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal >/dev/null
 . \$HOME/.cargo/env
+# Own target dir: never reuse objects built on a newer host.
+export CARGO_TARGET_DIR=/tmp/target
 cargo build --release --locked -p vinci
 
 APPDIR=/tmp/AppDir
-install -Dm755 target/release/vinci \$APPDIR/usr/bin/vinci
+install -Dm755 /tmp/target/release/vinci \$APPDIR/usr/bin/vinci
 install -Dm644 data/io.github.dionatansimioni.Vinci.desktop -t \$APPDIR/usr/share/applications
 install -Dm644 data/io.github.dionatansimioni.Vinci.metainfo.xml -t \$APPDIR/usr/share/metainfo
 install -Dm644 data/icons/io.github.dionatansimioni.Vinci.svg -t \$APPDIR/usr/share/icons/hicolor/scalable/apps
+# Symbolic icons the UI uses: KDE and other desktops may not ship Adwaita's.
+install -d \$APPDIR/usr/share/icons/Adwaita
+cp -r /usr/share/icons/Adwaita/index.theme /usr/share/icons/Adwaita/symbolic \$APPDIR/usr/share/icons/Adwaita/
+# Fixes for the GTK plugin's hook (theme, Wayland, SVG loaders); see the file itself.
+install -Dm644 build-aux/appimage/zz-vinci.sh \$APPDIR/apprun-hooks/zz-vinci.sh
 for lang in \$(grep -v '^#' po/LINGUAS); do
     install -d \$APPDIR/usr/share/locale/\$lang/LC_MESSAGES
     msgfmt -o \$APPDIR/usr/share/locale/\$lang/LC_MESSAGES/vinci.mo po/\$lang.po

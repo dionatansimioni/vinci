@@ -18,7 +18,7 @@
 | pt-BR completo, com teste que exige tradução e preserva marcadores | ✅ |
 | Vigia semanal (watchdog) + CI | ✅ watchdog executado localmente |
 | Empacotamento Flatpak (manifesto, AppStream, ícone) | ✅ arquivos validados; build não executado |
-| Script AppImage | ⚠️ escrito, **não executado** |
+| AppImage (38 MB, GLIBC ≥ 2.39) | ✅ gerada e testada num Ubuntu 24.04 limpo sem GTK |
 | Ponto de restauração + "Voltar a esta versão" | ✅ real (10 GB / 7 min para salvar, 17 s para restaurar) |
 | Preferências (idioma, GPU, restauração, instalador, pastas) | ✅ unitário + tela real |
 | Serviço de pastas monitoradas (`vinci --watch`) + autostart | ✅ real (conversão, sem reconversão, desligamento, instância única) |
@@ -26,5 +26,5 @@
 
 ## Pendente
 
-1. **Testes que dependem de você/ambiente**: podman rootless com usuário comum; GNOME/KDE reais (bandeja, notificações, Wayland+XWayland, atalho no menu); AMD e Intel; Studio com chave e com dongle; build Flatpak e AppImage.
+1. **Testes que dependem de você/ambiente**: podman rootless com usuário comum; GNOME/KDE reais (bandeja, notificações, Wayland+XWayland, atalho no menu); AMD e Intel; Studio com chave e com dongle; build Flatpak.
 2. **Publicar no GitHub** — só quando você disser que está pronto.
