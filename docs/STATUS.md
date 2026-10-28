@@ -26,6 +26,6 @@
 
 ## Pendente
 
-1. **Chave de assinatura das receitas** (minisign): gerar e guardar fora do repositório; colocar a pública em `recipe::PUBLIC_KEY`. Até lá, receitas remotas ficam desligadas (a embutida funciona).
+1. **Chave de assinatura**: gerada; falta você colocar senha e guardar cópias (veja README de assinatura em `scripts/sign-recipe.sh`).
 2. **Testes que dependem de você/ambiente**: podman rootless com usuário comum; GNOME/KDE reais (bandeja, notificações, Wayland+XWayland, atalho no menu); AMD e Intel; Studio com chave e com dongle; build Flatpak e AppImage.
 3. **Publicar no GitHub** — só quando você disser que está pronto.

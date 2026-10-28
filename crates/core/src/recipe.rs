@@ -15,8 +15,10 @@ pub const REMOTE_URL: &str =
     "https://raw.githubusercontent.com/dionatansimioni/vinci/main/data/recipe.toml";
 pub const REMOTE_SIG_URL: &str =
     "https://raw.githubusercontent.com/dionatansimioni/vinci/main/data/recipe.toml.minisig";
-/// minisign public key that signs remote recipes. Remote recipes stay disabled until set.
-pub const PUBLIC_KEY: Option<&str> = None;
+/// minisign public key that signs recipes (also in data/vinci-recipes.pub). The secret
+/// key lives outside the repository; see scripts/sign-recipe.sh.
+pub const PUBLIC_KEY: Option<&str> =
+    Some("RWSvI9MOU2HGZCGLgtKfovNzYMGq6cAzTSEyfZCoemSUKsmnqr1omNr2");
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -385,6 +387,20 @@ mod tests {
         assert_eq!(
             r.gpu.amd.apt_repo.as_ref().unwrap().source_line(),
             "deb [arch=amd64 signed-by=/etc/apt/keyrings/rocm.asc] https://repo.radeon.com/rocm/apt/7.2.4 noble main"
+        );
+    }
+
+    /// The repository's signature must match the recipe: editing data/recipe.toml without
+    /// re-signing (scripts/sign-recipe.sh) fails here, before it can reach users.
+    #[test]
+    fn repository_recipe_is_signed_with_our_key() {
+        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../data");
+        let sig = std::fs::read_to_string(format!("{root}/recipe.toml.minisig")).unwrap();
+        verify(BUNDLED, &sig, PUBLIC_KEY.unwrap()).expect("run scripts/sign-recipe.sh");
+        let pub_file = std::fs::read_to_string(format!("{root}/vinci-recipes.pub")).unwrap();
+        assert!(
+            pub_file.lines().any(|l| l.trim() == PUBLIC_KEY.unwrap()),
+            "data/vinci-recipes.pub matches the code"
         );
     }
 

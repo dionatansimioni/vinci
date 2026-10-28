@@ -6,3 +6,5 @@
 *.zip
 *.run
 *.tmp
+# Signing keys must never be committed
+*.key
