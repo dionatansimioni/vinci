@@ -18,6 +18,7 @@ pub mod installer_file;
 pub mod integrate;
 pub mod known_bad;
 pub mod launcher;
+pub mod progress;
 pub mod recipe;
 pub mod remote;
 pub mod settings;

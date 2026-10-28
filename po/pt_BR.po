@@ -539,3 +539,12 @@ msgstr "Dispositivos USB configurados. Reconecte o dongle ou o painel se já est
 
 msgid "Update or reinstall"
 msgstr "Atualizar ou reinstalar"
+
+msgid "about {minutes} min left"
+msgstr "cerca de {minutes} min restantes"
+
+msgid "less than 2 min left"
+msgstr "menos de 2 min restantes"
+
+msgid "taking longer than usual, still working…"
+msgstr "demorando mais que o normal, ainda trabalhando…"

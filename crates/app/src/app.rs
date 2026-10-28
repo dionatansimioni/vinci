@@ -47,6 +47,58 @@ impl Page {
     }
 }
 
+/// What the progress page shows; the bar itself is computed from it on every tick.
+struct Progress {
+    plan: Vec<rli_core::container::StepKind>,
+    index: usize,
+    step: String,
+    activity: String,
+    started: std::time::Instant,
+    step_started: std::time::Instant,
+    running: Arc<AtomicBool>,
+}
+
+impl Progress {
+    fn new(step: String) -> Self {
+        let now = std::time::Instant::now();
+        Self {
+            plan: Vec::new(),
+            index: 0,
+            step,
+            activity: String::new(),
+            started: now,
+            step_started: now,
+            running: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+/// Drops terminal colour codes (distrobox prints `\x1b[32m [ OK ]`) and surrounding space.
+fn clean_line(line: &str) -> String {
+    let mut out = String::with_capacity(line.len());
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        if c == '\x1b' {
+            // Skip `ESC [ ... letter`.
+            for c in chars.by_ref() {
+                if c.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        } else if !c.is_control() {
+            out.push(c);
+        }
+    }
+    // Tabs used for alignment become long gaps in a proportional label.
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// `2:05`, `12:40`.
+fn clock(d: std::time::Duration) -> String {
+    let s = d.as_secs();
+    format!("{}:{:02}", s / 60, s % 60)
+}
+
 pub struct App {
     page: Page,
     report: Report,
@@ -54,7 +106,7 @@ pub struct App {
     distro: Option<Distro>,
     installers: Vec<InstallerFile>,
     watching: Option<Arc<AtomicBool>>,
-    progress: (usize, usize, String),
+    progress: Progress,
     outcome: Option<Outcome>,
     error: Option<(String, String)>,
     toasts: adw::ToastOverlay,
@@ -91,6 +143,7 @@ pub enum Msg {
     },
     CopyReport,
     Back,
+    Tick,
 }
 
 #[derive(Debug)]
@@ -124,6 +177,8 @@ pub struct Widgets {
     watch_label: gtk::Label,
     progress_bar: gtk::ProgressBar,
     progress_label: gtk::Label,
+    progress_activity: gtk::Label,
+    progress_time: gtk::Label,
     done_page: adw::StatusPage,
     failed_page: adw::StatusPage,
     failed_details: gtk::Label,
@@ -291,7 +346,7 @@ impl Component for App {
             distro,
             installers: Vec::new(),
             watching: None,
-            progress: (0, 1, String::new()),
+            progress: Progress::new(String::new()),
             outcome: None,
             error: None,
             toasts: toasts.clone(),
@@ -393,7 +448,25 @@ impl Component for App {
             .show_text(false)
             .margin_top(12)
             .build();
-        let progress_label = gtk::Label::builder().margin_top(12).wrap(true).build();
+        let progress_label = gtk::Label::builder().wrap(true).build();
+        let spinner = gtk::Spinner::builder().spinning(true).build();
+        let step_row = gtk::Box::builder()
+            .spacing(8)
+            .halign(gtk::Align::Center)
+            .margin_top(12)
+            .build();
+        step_row.append(&spinner);
+        step_row.append(&progress_label);
+        // The latest line printed by the running command: proof that work is happening.
+        let progress_activity = gtk::Label::builder()
+            .margin_top(6)
+            .ellipsize(gtk::pango::EllipsizeMode::Middle)
+            .css_classes(["dim-label", "monospace", "caption"])
+            .build();
+        let progress_time = gtk::Label::builder()
+            .margin_top(12)
+            .css_classes(["dim-label"])
+            .build();
         let progress_page = page_box(&[
             adw::StatusPage::builder()
                 .icon_name("system-software-install-symbolic")
@@ -404,7 +477,9 @@ impl Component for App {
                 .build()
                 .upcast_ref(),
             progress_bar.upcast_ref(),
-            progress_label.upcast_ref(),
+            step_row.upcast_ref(),
+            progress_activity.upcast_ref(),
+            progress_time.upcast_ref(),
         ]);
 
         // Done page
@@ -511,6 +586,8 @@ impl Component for App {
             watch_label,
             progress_bar,
             progress_label,
+            progress_activity,
+            progress_time,
             done_page,
             failed_page,
             failed_details,
@@ -526,6 +603,7 @@ impl Component for App {
                 self.refresh_installers();
                 self.page = Page::Source;
             }
+            Msg::Tick => {}
             Msg::Back => {
                 stop_watching(&mut self.watching);
                 self.page = Page::Check;
@@ -786,16 +864,26 @@ impl Component for App {
                 self.installers = found;
                 self.watching = None;
             }
-            Cmd::Progress(Event::Started { index, total, kind }) => {
-                self.progress = (index, total, messages::step(kind));
+            Cmd::Progress(Event::Plan(plan)) => self.progress.plan = plan,
+            Cmd::Progress(Event::Started { index, kind, .. }) => {
+                self.progress.index = index;
+                self.progress.step = messages::step(kind);
+                self.progress.step_started = std::time::Instant::now();
+                self.progress.activity.clear();
+            }
+            Cmd::Progress(Event::Output(line)) => {
+                let line = clean_line(&line);
+                if !line.is_empty() {
+                    self.progress.activity = line;
+                }
             }
             Cmd::Progress(Event::TryingMirror { image }) => {
-                self.progress.2 = format!("{} {image}", tr("Trying mirror"));
+                self.progress.step = format!("{} {image}", tr("Trying mirror"));
             }
             Cmd::Progress(Event::RecreatingContainer) => {
-                self.progress.2 = tr("Recreating the container and trying again");
+                self.progress.step = tr("Recreating the container and trying again");
             }
-            Cmd::Progress(Event::Finished { .. }) => self.progress.0 += 1,
+            Cmd::Progress(Event::Finished { .. }) => {}
             Cmd::HostReady => {}
             Cmd::Update(info) => self.update = Some(info),
             Cmd::Health(problems) => self.problems = problems,
@@ -846,6 +934,7 @@ impl Component for App {
                 self.toasts.add_toast(adw::Toast::new(&text));
             }
             Cmd::Finished(Ok(outcome)) => {
+                self.progress.running.store(false, Ordering::Relaxed);
                 self.backup = State::load(&State::default_path())
                     .ok()
                     .and_then(|s| s.backup);
@@ -857,6 +946,7 @@ impl Component for App {
                 self.page = Page::Done;
             }
             Cmd::Finished(Err(e)) => {
+                self.progress.running.store(false, Ordering::Relaxed);
                 self.error = Some(e);
                 self.page = Page::Failed;
             }
@@ -1009,10 +1099,19 @@ impl Component for App {
             String::new()
         });
 
-        let (done, total, label) = &self.progress;
-        w.progress_bar
-            .set_fraction(*done as f64 / (*total).max(1) as f64);
-        w.progress_label.set_label(label);
+        let p = &self.progress;
+        let est = rli_core::progress::estimate(&p.plan, p.index, p.step_started.elapsed());
+        w.progress_bar.set_fraction(est.fraction);
+        w.progress_label.set_label(&p.step);
+        w.progress_activity.set_label(&p.activity);
+        let left = match est.remaining {
+            Some(r) if r.as_secs() >= 90 => tr("about {minutes} min left")
+                .replace("{minutes}", &r.as_secs().div_ceil(60).to_string()),
+            Some(_) => tr("less than 2 min left"),
+            None => tr("taking longer than usual, still working…"),
+        };
+        w.progress_time
+            .set_label(&format!("{} · {left}", clock(p.started.elapsed())));
 
         if let Some(o) = &self.outcome {
             w.done_page.set_title(&format!(
@@ -1184,7 +1283,19 @@ impl App {
             return;
         };
         self.page = Page::Progress;
-        self.progress = (0, 1, tr("Preparing"));
+        self.progress = Progress::new(tr("Preparing"));
+        self.progress.running.store(true, Ordering::Relaxed);
+        // Redraw every second so the bar and clock move during long steps.
+        let running = self.progress.running.clone();
+        let input = sender.input_sender().clone();
+        gtk::glib::timeout_add_seconds_local(1, move || {
+            if running.load(Ordering::Relaxed) {
+                input.emit(Msg::Tick);
+                gtk::glib::ControlFlow::Continue
+            } else {
+                gtk::glib::ControlFlow::Break
+            }
+        });
         let gpus = self.gpus.clone();
         sender.spawn_command(move |out| {
             let result = install_blocking(&file, &gpus, &gpu, &out);
@@ -1247,7 +1358,15 @@ fn install_blocking(
         keep_installer: settings().keep_installer,
         keep_restore_point: settings().keep_restore_point,
     };
+    // apt prints thousands of lines; forward at most ~5 per second to keep the UI light.
+    let mut last_line = std::time::Instant::now() - std::time::Duration::from_secs(1);
     flow::install_resolve(&runner, &recipe, &req, &mut |e| {
+        if let Event::Output(_) = &e {
+            if last_line.elapsed() < std::time::Duration::from_millis(200) {
+                return;
+            }
+            last_line = std::time::Instant::now();
+        }
         let _ = out.send(Cmd::Progress(e));
     })
     .map_err(|e| {
@@ -1260,4 +1379,28 @@ fn install_blocking(
         };
         (messages::failure(&e), details)
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cleans_terminal_lines() {
+        assert_eq!(
+            clean_line("Starting container...  \x1b[32m [ OK ]\x1b[0m"),
+            "Starting container... [ OK ]"
+        );
+        assert_eq!(
+            clean_line("\rSetting up libxcb1 (1.15) ...\n"),
+            "Setting up libxcb1 (1.15) ..."
+        );
+        assert_eq!(clean_line("   "), "");
+    }
+
+    #[test]
+    fn formats_clock() {
+        assert_eq!(clock(std::time::Duration::from_secs(125)), "2:05");
+        assert_eq!(clock(std::time::Duration::from_secs(760)), "12:40");
+    }
 }

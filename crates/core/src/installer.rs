@@ -7,6 +7,10 @@ use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
+    /// The steps about to run, sent once before the first one.
+    Plan(Vec<StepKind>),
+    /// A line printed by the running step.
+    Output(String),
     Started {
         index: usize,
         total: usize,
@@ -102,6 +106,7 @@ pub fn execute(
     on: &mut dyn FnMut(Event),
 ) -> Result<(), Error> {
     let total = steps.len();
+    on(Event::Plan(steps.iter().map(|s| s.kind).collect()));
     for (index, step) in steps.iter().enumerate() {
         on(Event::Started {
             index,
@@ -109,7 +114,12 @@ pub fn execute(
             kind: step.kind,
         });
         let start = Instant::now();
-        let out = run(runner, step.kind, &step.argv)?;
+        let out = runner
+            .run_streaming(&step.argv, &mut |line| on(Event::Output(line.to_string())))
+            .map_err(|source| Error::Spawn {
+                kind: step.kind,
+                source,
+            })?;
         let recovered = !out.success
             && match step.kind {
                 StepKind::PullImage => pull_from_mirrors(runner, ctx, on)?,
