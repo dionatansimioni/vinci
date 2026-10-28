@@ -89,6 +89,15 @@ impl HostRunner {
         exec(&self.mode.wrap_root(argv))
     }
 
+    /// [`Self::run_root`] with every output line handed to `on_line` as it appears.
+    pub fn run_root_streaming(
+        &self,
+        argv: &[String],
+        on_line: &mut dyn FnMut(&str),
+    ) -> std::io::Result<Output> {
+        exec_streaming(&self.mode.wrap_root(argv), on_line)
+    }
+
     /// Runs an argv that is already complete (no Flatpak wrapping) and returns stdout
     /// when it succeeds.
     pub fn run_plain(&self, argv: &[String]) -> std::io::Result<String> {

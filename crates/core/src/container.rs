@@ -26,6 +26,10 @@ pub enum StepKind {
     /// The installer exits 0 even on abort, so check the binary actually landed.
     Verify,
     RemoveConflictingLibs,
+    /// Host prerequisites (`tools::Action`), run before the container plan; listed here so
+    /// the whole job shares one progress bar.
+    InstallPodman,
+    InstallDistrobox,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

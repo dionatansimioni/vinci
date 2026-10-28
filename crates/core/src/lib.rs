@@ -23,6 +23,7 @@ pub mod recipe;
 pub mod remote;
 pub mod settings;
 pub mod state;
+pub mod terminal;
 pub mod tools;
 pub mod udev;
 pub mod uninstall;

@@ -19,6 +19,9 @@ pub fn expected(kind: StepKind) -> Duration {
         StepKind::InstallResolve => 165,
         StepKind::Verify => 1,
         StepKind::RemoveConflictingLibs => 1,
+        // Package manager download + install, plus the password prompt.
+        StepKind::InstallPodman => 60,
+        StepKind::InstallDistrobox => 10,
     };
     Duration::from_secs(secs)
 }

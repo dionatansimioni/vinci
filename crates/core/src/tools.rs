@@ -95,6 +95,18 @@ pub enum Action {
     InstallDistrobox { argv: Vec<String>, prefix: PathBuf },
 }
 
+impl Action {
+    /// The progress-bar step for this action; `None` when nothing runs (manual install).
+    pub fn step_kind(&self) -> Option<crate::container::StepKind> {
+        use crate::container::StepKind;
+        match self {
+            Self::InstallPodman { .. } => Some(StepKind::InstallPodman),
+            Self::InstallDistrobox { .. } => Some(StepKind::InstallDistrobox),
+            Self::ManualPodman { .. } => None,
+        }
+    }
+}
+
 /// What has to happen on the host before containers can be created.
 pub fn plan(tools: &HostTools, distro: &Distro, recipe: &Recipe, home: &Path) -> Vec<Action> {
     let mut actions = Vec::new();
@@ -136,6 +148,24 @@ mod tests {
 
     fn ubuntu() -> Distro {
         Distro::parse("ID=ubuntu\nID_LIKE=debian\nPRETTY_NAME=\"Ubuntu\"\n")
+    }
+
+    #[test]
+    fn host_actions_map_to_progress_steps() {
+        use crate::container::StepKind;
+        let t = HostTools {
+            podman: None,
+            distrobox: DistroboxChoice::Install,
+        };
+        let kinds: Vec<_> = plan(&t, &ubuntu(), &Recipe::bundled(), Path::new("/h"))
+            .iter()
+            .filter_map(Action::step_kind)
+            .collect();
+        assert_eq!(kinds, [StepKind::InstallPodman, StepKind::InstallDistrobox]);
+        let manual = Action::ManualPodman {
+            hint: String::new(),
+        };
+        assert_eq!(manual.step_kind(), None);
     }
 
     #[test]
