@@ -1,7 +1,8 @@
 # Vinci recipe: everything about the outside world that changes over time.
 #
-# The app embeds this file and may fetch a newer signed copy from GitHub.
-# Purely declarative: no shell snippets, and every field is validated before use.
+# Embedded in the app and shipped with each release: to change what Vinci installs, edit
+# this file and release a new version. Purely declarative: no shell snippets, and every
+# field is validated (a broken edit fails `cargo test`).
 # Bump `revision` on every change; bump `schema` only when the format changes.
 
 schema = 1

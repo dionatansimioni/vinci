@@ -1,13 +1,12 @@
-//! Everything fetched from the network: latest Resolve version, the known-bad list and
-//! signed recipe updates. All of it is optional (offline-first, SPEC §12.9): any failure
+//! Everything fetched from the network: the latest Resolve version and the known-bad
+//! list. All of it is optional (offline-first, SPEC §12.9): any failure
 //! degrades to what the app already has.
 
 use crate::blackmagic;
 use crate::installer_file::Edition;
 use crate::known_bad::{self, Entry, KnownBad};
-use crate::recipe::{self, Recipe, RecipeError, Source};
+use crate::recipe::Recipe;
 use crate::version::Version;
-use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Fetches a URL as text. The real one uses HTTP; tests use a map.
@@ -52,47 +51,6 @@ impl Fetch for Http {
             .limit(1024 * 1024)
             .read_to_string()
             .ok()
-    }
-}
-
-/// Where the last verified remote recipe is kept for offline use.
-pub fn recipe_cache_dir(home: &Path) -> PathBuf {
-    home.join(".cache/vinci/recipe")
-}
-
-/// The recipe to use now: a newer signed remote one if available (fresh or cached),
-/// otherwise the bundled one. Returns why a remote recipe was rejected, if it was.
-pub fn effective_recipe(
-    fetch: &dyn Fetch,
-    cache_dir: &Path,
-    public_key: Option<&str>,
-) -> (Recipe, Source, Option<RecipeError>) {
-    let bundled = Recipe::bundled();
-    if public_key.is_none() {
-        return (bundled, Source::Bundled, None);
-    }
-    let fresh = fetch
-        .get(recipe::REMOTE_URL)
-        .zip(fetch.get(recipe::REMOTE_SIG_URL));
-    if let Some((text, sig)) = &fresh {
-        let (r, src, err) = recipe::choose(bundled.clone(), Some((text, sig)), public_key);
-        if src == Source::Remote {
-            let _ = std::fs::create_dir_all(cache_dir)
-                .and_then(|()| std::fs::write(cache_dir.join("recipe.toml"), text))
-                .and_then(|()| std::fs::write(cache_dir.join("recipe.toml.minisig"), sig));
-            return (r, src, None);
-        }
-        if err.is_some() {
-            return (r, src, err);
-        }
-    }
-    // Offline (or nothing newer online): fall back to the cached copy, re-verified.
-    let cached = std::fs::read_to_string(cache_dir.join("recipe.toml"))
-        .ok()
-        .zip(std::fs::read_to_string(cache_dir.join("recipe.toml.minisig")).ok());
-    match cached {
-        Some((text, sig)) => recipe::choose(bundled, Some((&text, &sig)), public_key),
-        None => (bundled, Source::Bundled, None),
     }
 }
 
@@ -189,89 +147,6 @@ mod tests {
                 latest_is_bad: None
             }
         );
-    }
-
-    mod signed {
-        use super::*;
-        use minisign::KeyPair;
-        use std::io::Cursor;
-
-        fn signed(revision: u32, kp: &KeyPair) -> (String, String) {
-            let text = recipe::BUNDLED.replacen(
-                &format!("revision = {}", Recipe::bundled().revision),
-                &format!("revision = {revision}"),
-                1,
-            );
-            let sig = minisign::sign(
-                Some(&kp.pk),
-                &kp.sk,
-                Cursor::new(text.as_bytes()),
-                None,
-                None,
-            )
-            .unwrap()
-            .to_string();
-            (text, sig)
-        }
-
-        fn cache(name: &str) -> PathBuf {
-            std::env::temp_dir().join(format!("rli-remote-{}-{name}", std::process::id()))
-        }
-
-        #[test]
-        fn caches_verified_recipe_and_uses_it_offline() {
-            let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let pk = kp.pk.to_base64();
-            let (text, sig) = signed(Recipe::bundled().revision + 5, &kp);
-            let dir = cache("offline");
-            let online = Map::default()
-                .with(recipe::REMOTE_URL, &text)
-                .with(recipe::REMOTE_SIG_URL, &sig);
-            let (r, src, _) = effective_recipe(&online, &dir, Some(&pk));
-            assert_eq!(
-                (r.revision, src),
-                (Recipe::bundled().revision + 5, Source::Remote)
-            );
-
-            let (r, src, err) = effective_recipe(&Map::default(), &dir, Some(&pk));
-            let _ = std::fs::remove_dir_all(&dir);
-            assert_eq!(
-                (r.revision, src, err),
-                (Recipe::bundled().revision + 5, Source::Remote, None)
-            );
-        }
-
-        #[test]
-        fn tampered_cache_is_rejected() {
-            let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let (text, sig) = signed(Recipe::bundled().revision + 5, &kp);
-            let dir = cache("tampered");
-            std::fs::create_dir_all(&dir).unwrap();
-            std::fs::write(dir.join("recipe.toml"), text.replace("ffmpeg", "evil")).unwrap();
-            std::fs::write(dir.join("recipe.toml.minisig"), sig).unwrap();
-            let (r, src, err) = effective_recipe(&Map::default(), &dir, Some(&kp.pk.to_base64()));
-            let _ = std::fs::remove_dir_all(&dir);
-            assert_eq!(
-                (r.revision, src, err),
-                (
-                    Recipe::bundled().revision,
-                    Source::Bundled,
-                    Some(RecipeError::Signature)
-                )
-            );
-        }
-
-        #[test]
-        fn no_key_means_bundled_and_no_network() {
-            struct Panics;
-            impl Fetch for Panics {
-                fn get(&self, _: &str) -> Option<String> {
-                    panic!("must not fetch without a key")
-                }
-            }
-            let (_, src, _) = effective_recipe(&Panics, &cache("nokey"), None);
-            assert_eq!(src, Source::Bundled);
-        }
     }
 
     /// Hits the real Blackmagic endpoint. Run with `--ignored` when online.

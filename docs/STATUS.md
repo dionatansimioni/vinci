@@ -5,7 +5,7 @@
 | Área | Situação |
 |---|---|
 | Verificação de hardware (GPU, driver, RAM, disco, híbridos) | ✅ unitário + tela real |
-| Receita declarativa assinada (minisign) + cache offline | ✅ unitário (chave de produção pendente) |
+| Receita declarativa embutida, validada com rigor | ✅ unitário |
 | Preparação do host (podman via pkexec, distrobox fixado em prefixo privado) | ✅ unitário; ✅ distrobox real |
 | Plano de instalação + executor com recuperação (espelhos, init) | ✅ unitário; ✅ real (NVIDIA) |
 | Fluxo completo: atalho, ícone, MIME, estado, cópia do instalador | ✅ real; atalho abre o Resolve com CUDA |
@@ -26,6 +26,5 @@
 
 ## Pendente
 
-1. **Chave de assinatura**: gerada; falta você colocar senha e guardar cópias (veja README de assinatura em `scripts/sign-recipe.sh`).
-2. **Testes que dependem de você/ambiente**: podman rootless com usuário comum; GNOME/KDE reais (bandeja, notificações, Wayland+XWayland, atalho no menu); AMD e Intel; Studio com chave e com dongle; build Flatpak e AppImage.
-3. **Publicar no GitHub** — só quando você disser que está pronto.
+1. **Testes que dependem de você/ambiente**: podman rootless com usuário comum; GNOME/KDE reais (bandeja, notificações, Wayland+XWayland, atalho no menu); AMD e Intel; Studio com chave e com dongle; build Flatpak e AppImage.
+2. **Publicar no GitHub** — só quando você disser que está pronto.

@@ -1,8 +1,8 @@
 //! Recipes: the declarative description of images, packages, repositories and URLs.
 //!
-//! A copy is embedded at build time. A newer one may be fetched from GitHub, but it is
-//! only used when its minisign signature checks out, its schema matches, it passes
-//! validation, and its revision is higher than the embedded one.
+//! The recipe is embedded at build time and ships with each app release; changing what
+//! Vinci installs means editing data/recipe.toml, not code. It is validated strictly so
+//! a mistake in an edit fails the tests instead of reaching users.
 
 use crate::version::Version;
 use serde::Deserialize;
@@ -11,14 +11,6 @@ use std::collections::BTreeMap;
 /// Recipe format this build understands.
 pub const SCHEMA: u32 = 1;
 pub const BUNDLED: &str = include_str!("../../../data/recipe.toml");
-pub const REMOTE_URL: &str =
-    "https://raw.githubusercontent.com/dionatansimioni/vinci/main/data/recipe.toml";
-pub const REMOTE_SIG_URL: &str =
-    "https://raw.githubusercontent.com/dionatansimioni/vinci/main/data/recipe.toml.minisig";
-/// minisign public key that signs recipes (also in data/vinci-recipes.pub). The secret
-/// key lives outside the repository; see scripts/sign-recipe.sh.
-pub const PUBLIC_KEY: Option<&str> =
-    Some("RWSvI9MOU2HGZCGLgtKfovNzYMGq6cAzTSEyfZCoemSUKsmnqr1omNr2");
 
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -153,18 +145,10 @@ pub enum RecipeError {
     Schema { found: u32 },
     #[error("invalid recipe field {field}: {value:?}")]
     Invalid { field: &'static str, value: String },
-    #[error("recipe signature is invalid")]
-    Signature,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Source {
-    Bundled,
-    Remote,
 }
 
 impl Recipe {
-    /// Parses and validates. Remote input goes through here, so be strict.
+    /// Parses and validates.
     pub fn parse(text: &str) -> Result<Self, RecipeError> {
         // Check the schema first so a future format gets a clear error, not a field error.
         #[derive(Deserialize)]
@@ -283,32 +267,6 @@ impl Recipe {
     }
 }
 
-/// Picks the recipe to use. The remote one wins only when everything checks out;
-/// any failure falls back to the bundled recipe and reports why.
-pub fn choose(
-    bundled: Recipe,
-    remote: Option<(&str, &str)>,
-    public_key: Option<&str>,
-) -> (Recipe, Source, Option<RecipeError>) {
-    let (Some((text, sig)), Some(key)) = (remote, public_key) else {
-        return (bundled, Source::Bundled, None);
-    };
-    match verify(text, sig, key).and_then(|()| Recipe::parse(text)) {
-        Ok(r) if r.revision > bundled.revision => (r, Source::Remote, None),
-        Ok(_) => (bundled, Source::Bundled, None),
-        Err(e) => (bundled, Source::Bundled, Some(e)),
-    }
-}
-
-/// Verifies a minisign signature (`.minisig` file contents) over `text`.
-pub fn verify(text: &str, signature: &str, public_key: &str) -> Result<(), RecipeError> {
-    let pk =
-        minisign_verify::PublicKey::from_base64(public_key).map_err(|_| RecipeError::Signature)?;
-    let sig = minisign_verify::Signature::decode(signature).map_err(|_| RecipeError::Signature)?;
-    pk.verify(text.as_bytes(), &sig, false)
-        .map_err(|_| RecipeError::Signature)
-}
-
 fn is_token(s: &str) -> bool {
     !s.is_empty()
         && s.chars()
@@ -390,20 +348,6 @@ mod tests {
         );
     }
 
-    /// The repository's signature must match the recipe: editing data/recipe.toml without
-    /// re-signing (scripts/sign-recipe.sh) fails here, before it can reach users.
-    #[test]
-    fn repository_recipe_is_signed_with_our_key() {
-        let root = concat!(env!("CARGO_MANIFEST_DIR"), "/../../data");
-        let sig = std::fs::read_to_string(format!("{root}/recipe.toml.minisig")).unwrap();
-        verify(BUNDLED, &sig, PUBLIC_KEY.unwrap()).expect("run scripts/sign-recipe.sh");
-        let pub_file = std::fs::read_to_string(format!("{root}/vinci-recipes.pub")).unwrap();
-        assert!(
-            pub_file.lines().any(|l| l.trim() == PUBLIC_KEY.unwrap()),
-            "data/vinci-recipes.pub matches the code"
-        );
-    }
-
     #[test]
     fn distrobox_compatibility_window() {
         let d = Recipe::bundled().distrobox;
@@ -462,91 +406,6 @@ mod tests {
             assert!(BUNDLED.contains(from), "fixture text missing: {from}");
             let r = with(|s| s.replacen(from, to, 1));
             assert!(r.is_err(), "accepted {to}");
-        }
-    }
-
-    mod signing {
-        use super::*;
-        use minisign::KeyPair;
-        use std::io::Cursor;
-
-        fn sign(text: &str, kp: &KeyPair) -> String {
-            minisign::sign(
-                Some(&kp.pk),
-                &kp.sk,
-                Cursor::new(text.as_bytes()),
-                None,
-                None,
-            )
-            .unwrap()
-            .to_string()
-        }
-
-        fn remote_text(revision: u32) -> String {
-            BUNDLED.replacen(
-                &format!("revision = {}", Recipe::bundled().revision),
-                &format!("revision = {revision}"),
-                1,
-            )
-        }
-
-        #[test]
-        fn accepts_newer_signed_recipe() {
-            let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let text = remote_text(Recipe::bundled().revision + 5);
-            let sig = sign(&text, &kp);
-            let (r, src, err) = choose(
-                Recipe::bundled(),
-                Some((&text, &sig)),
-                Some(&kp.pk.to_base64()),
-            );
-            assert_eq!(
-                (r.revision, src, err),
-                (Recipe::bundled().revision + 5, Source::Remote, None)
-            );
-        }
-
-        #[test]
-        fn rejects_tampered_or_foreign_signature() {
-            let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let other = KeyPair::generate_unencrypted_keypair().unwrap();
-            let text = remote_text(Recipe::bundled().revision + 5);
-            let sig = sign(&text, &kp);
-            let tampered = text.replace("ffmpeg", "ffmpeg-evil");
-            let (r, src, err) = choose(
-                Recipe::bundled(),
-                Some((&tampered, &sig)),
-                Some(&kp.pk.to_base64()),
-            );
-            assert_eq!(
-                (r.revision, src, err),
-                (
-                    Recipe::bundled().revision,
-                    Source::Bundled,
-                    Some(RecipeError::Signature)
-                )
-            );
-            let (_, src, err) = choose(
-                Recipe::bundled(),
-                Some((&text, &sig)),
-                Some(&other.pk.to_base64()),
-            );
-            assert_eq!((src, err), (Source::Bundled, Some(RecipeError::Signature)));
-        }
-
-        #[test]
-        fn ignores_older_or_equal_revision_and_missing_key() {
-            let kp = KeyPair::generate_unencrypted_keypair().unwrap();
-            let text = remote_text(Recipe::bundled().revision);
-            let sig = sign(&text, &kp);
-            let (_, src, err) = choose(
-                Recipe::bundled(),
-                Some((&text, &sig)),
-                Some(&kp.pk.to_base64()),
-            );
-            assert_eq!((src, err), (Source::Bundled, None));
-            let (_, src, _) = choose(Recipe::bundled(), Some((&text, &sig)), None);
-            assert_eq!(src, Source::Bundled);
         }
     }
 }

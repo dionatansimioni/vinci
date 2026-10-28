@@ -99,8 +99,8 @@ Ver [FACTS.md](FACTS.md). Pontos que contradizem decisões estão em revisão co
 
 Princípio: separar o que muda (dados) do que não muda (código), detectar quebras antes do usuário e sempre ter um caminho de volta.
 
-1. **Receitas declarativas** (TOML versionado): imagem/tag/espelhos, pacotes, libs a remover, variáveis de ambiente, repositórios ROCm/NEO, URLs da Blackmagic, versão fixada do distrobox. Adaptar o app = editar dados.
-2. **Receitas remotas** baixadas do GitHub entre releases: só declarativas (sem scripts), **assinadas com minisign** (chave pública embutida), com fallback para a receita embutida.
+1. **Receita declarativa** (TOML versionado, embutida no app): imagem/tag/espelhos, pacotes, libs a remover, variáveis de ambiente, repositórios ROCm/NEO, URLs da Blackmagic, versão fixada do distrobox. Adaptar o app = editar dados.
+2. ~~Receitas remotas assinadas~~ — **revisto em 2026-10-28**: a receita é só embutida e chega aos usuários com cada versão do app (Flathub/AppImage se atualizam sozinhos). Motivo: sem chave para guardar e sem porta remota de ataque; assinar a receita protegia pouco, já que as próprias atualizações do app vêm do mesmo GitHub. O vigia semanal (item 10) avisa quando é hora de lançar uma correção.
 3. **Migração de base**: quando a receita apontar uma base nova, fluxo igual ao Free→Studio (container novo, validar, oferecer remover o antigo).
 4. **Ponto de restauração**: `podman commit` antes de atualizar/migrar; botão "Voltar a esta versão"; guarda só o último; desligável. Medido: ~10 GB e ~7 min para salvar, ~17 s para restaurar.
 5. **Cópia do instalador**: guarda o último zip que funcionou em `~/.local/share/vinci/installers`; desligável.
