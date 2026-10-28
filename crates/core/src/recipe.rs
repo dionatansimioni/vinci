@@ -119,6 +119,8 @@ pub struct ResolveSetup {
     #[serde(default)]
     pub remove_libs: Vec<String>,
     #[serde(default)]
+    pub udev_rules: Vec<String>,
+    #[serde(default)]
     pub installer_env: BTreeMap<String, String>,
 }
 
@@ -234,6 +236,12 @@ impl Recipe {
         if !self.resolve.install_dir.starts_with('/') || has_unsafe_path(&self.resolve.install_dir)
         {
             return bad("resolve.install_dir", &self.resolve.install_dir);
+        }
+        for pattern in &self.resolve.udev_rules {
+            if pattern.starts_with('/') || has_unsafe_path(pattern) || !pattern.ends_with(".rules")
+            {
+                return bad("resolve.udev_rules", pattern);
+            }
         }
         for arg in &self.resolve.installer_args {
             if !is_flag(arg) {

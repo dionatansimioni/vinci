@@ -23,6 +23,7 @@ pub mod remote;
 pub mod settings;
 pub mod state;
 pub mod tools;
+pub mod udev;
 pub mod uninstall;
 pub mod version;
 pub mod watch;

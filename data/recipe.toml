@@ -5,7 +5,7 @@
 # Bump `revision` on every change; bump `schema` only when the format changes.
 
 schema = 1
-revision = 2
+revision = 3
 
 [container]
 image = "docker.io/library/ubuntu:24.04"
@@ -96,6 +96,13 @@ remove_libs = [
     "libs/libglib-2.0.so*",
     "libs/libgio-2.0.so*",
     "libs/libgmodule-2.0.so*",
+]
+
+# udev rules Resolve installs inside the container (paths relative to the container's /).
+# Copied to the host only after passing core::udev's allow-list.
+udev_rules = [
+    "opt/resolve/share/etc/udev/rules.d/*.rules",
+    "usr/lib/udev/rules.d/75-davinci*.rules",
 ]
 
 [resolve.installer_env]

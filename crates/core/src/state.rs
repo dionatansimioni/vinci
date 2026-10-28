@@ -39,9 +39,9 @@ pub struct State {
     /// What the restore point (`backup::IMAGE`) contains, if one exists.
     #[serde(default)]
     pub backup: Option<Installation>,
-    /// Studio dongle udev rule file we wrote, if any.
+    /// udev rules Vinci copied to the host (Studio dongle, panels), for uninstall.
     #[serde(default)]
-    pub udev_rule: Option<PathBuf>,
+    pub udev_rules: Vec<PathBuf>,
 }
 
 impl State {

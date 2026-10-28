@@ -144,7 +144,13 @@ pub fn uninstall(
         let _ = std::fs::remove_dir_all(dir);
     }
     state.installation = None;
-    state.udev_rule = None;
+    if !state.udev_rules.is_empty() {
+        if run_root(&crate::udev::remove_command(&state.udev_rules)) {
+            state.udev_rules.clear();
+        } else {
+            sum.warnings.push("udev rules".into());
+        }
+    }
     if state.tools.is_empty() {
         let _ = std::fs::remove_file(state_path);
     } else if let Err(e) = state.save(state_path) {
@@ -181,6 +187,7 @@ mod tests {
                 prefix: home.join(".local/share/vinci/distrobox"),
             },
         );
+        st.udev_rules = vec!["/etc/udev/rules.d/99-BlackmagicDevices.rules".into()];
         st.installation = Some(Installation {
             container: "vinci-free".into(),
             edition: Edition::Free,
@@ -207,7 +214,13 @@ mod tests {
         let r = runner("vinci-free\nvinci-studio\n");
         let sum = uninstall(
             &r,
-            &|_| panic!("no root needed"),
+            &|a: &[String]| {
+                assert!(
+                    a[2].contains("udev"),
+                    "only the udev rules need root here: {a:?}"
+                );
+                true
+            },
             &Recipe::bundled(),
             &ubuntu(),
             &Locations {
@@ -253,6 +266,10 @@ mod tests {
         );
         assert_eq!(sum.removed_tools, ["podman", "distrobox"]);
         assert_eq!(roots.borrow()[0], ["apt-get", "remove", "-y", "podman"]);
+        assert!(
+            roots.borrow()[1][2].contains("rm -f"),
+            "udev rules removed as root"
+        );
         assert!(!resolve_data_dir(&home.0).exists());
         assert!(!home.0.join(".local/share/vinci").exists());
         assert!(!state_path.exists(), "nothing left to remember");
@@ -265,7 +282,13 @@ mod tests {
         let r = runner("vinci-free\nmy-arch-box\n");
         let sum = uninstall(
             &r,
-            &|_| panic!("podman must not be removed"),
+            &|a: &[String]| {
+                assert!(
+                    !a.contains(&"podman".to_string()),
+                    "podman must not be removed"
+                );
+                true
+            },
             &Recipe::bundled(),
             &ubuntu(),
             &Locations {
