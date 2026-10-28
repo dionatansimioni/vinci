@@ -6,7 +6,7 @@
 # Bump `revision` on every change; bump `schema` only when the format changes.
 
 schema = 1
-revision = 4
+revision = 5
 
 [container]
 image = "docker.io/library/ubuntu:24.04"
@@ -74,7 +74,9 @@ base = [
 packages = []
 
 [gpu.amd]
-packages = ["rocm-opencl-runtime"]
+# mesa-va-drivers: VA-API for hardware video encoding in the Media tab (without it ffmpeg
+# fails with "vaapi_device: Input/output error").
+packages = ["rocm-opencl-runtime", "mesa-va-drivers"]
 
 [gpu.amd.apt_repo]
 name = "rocm"
@@ -85,7 +87,20 @@ components = ["main"]
 
 [gpu.intel]
 experimental = true
-packages = ["intel-opencl-icd"]
+# Ubuntu 24.04's own intel-opencl-icd (23.43) predates working OpenCL/OpenGL sharing on
+# Linux (compute-runtime 24.13), which Resolve needs; with it Resolve can stall on its
+# splash screen.
+# The Ubuntu team's Intel graphics PPA (the one Intel's install guide points to) has
+# current releases for every GPU Vinci accepts (Gen12 and newer).
+# intel-media-va-driver + libmfx-gen1.2: VA-API and Quick Sync for the Media tab.
+packages = ["intel-opencl-icd", "intel-media-va-driver", "libmfx-gen1.2"]
+
+[gpu.intel.apt_repo]
+name = "intel-graphics"
+key_url = "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0x0C0E6AF955CE463C03FC51574D098D70AFBE5E1F"
+url = "https://ppa.launchpadcontent.net/kobuk-team/intel-graphics/ubuntu"
+suite = "noble"
+components = ["main"]
 
 [resolve]
 install_dir = "/opt/resolve"

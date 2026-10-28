@@ -18,6 +18,9 @@ pub enum Problem {
     LauncherMissing,
     /// The GPU isn't visible inside the container (driver updated, device moved…).
     GpuNotVisible,
+    /// The container predates the current recipe: a package or repository it now asks
+    /// for (e.g. a newer GPU driver) is missing.
+    PackagesOutdated,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +31,9 @@ pub enum Repair {
     Reinstall,
     /// Nothing automatic; explain (e.g. reboot after a driver update).
     Explain,
+    /// Install what the recipe asks for into the existing container
+    /// (`container::package_steps`). Resolve and its settings stay as they are.
+    UpdatePackages,
 }
 
 impl Problem {
@@ -36,6 +42,7 @@ impl Problem {
             Self::LauncherMissing => Repair::RecreateLauncher,
             Self::ContainerMissing | Self::ResolveMissing => Repair::Reinstall,
             Self::GpuNotVisible => Repair::Explain,
+            Self::PackagesOutdated => Repair::UpdatePackages,
         }
     }
 }
@@ -48,6 +55,28 @@ fn gpu_probe(vendor: Vendor) -> Option<Vec<String>> {
         Vendor::Amd | Vendor::Intel => Some(argv(&["sh", "-c", "clinfo -l | grep -q Platform"])),
         Vendor::Other(_) => None,
     }
+}
+
+/// Succeeds when the container has the vendor repository and every package installed.
+fn packages_probe(recipe: &Recipe, vendor: Option<Vendor>) -> Vec<String> {
+    let (packages, repo) = match vendor {
+        Some(v) => crate::container::requirements(recipe, v),
+        None => (recipe.packages.base.clone(), None),
+    };
+    let list = repo
+        .map(|r| format!("/etc/apt/sources.list.d/{}.list", r.name))
+        .unwrap_or_default();
+    // Unknown packages print nothing on stdout, so count the installed ones instead of
+    // looking for bad lines.
+    let mut a = argv(&[
+        "sh",
+        "-c",
+        r#"list=$1; shift; if [ -n "$list" ] && [ ! -f "$list" ]; then exit 1; fi; n=$(dpkg-query -W -f='${db:Status-Abbrev}\n' "$@" 2>/dev/null | grep -c '^ii'); [ "$n" -eq $# ]"#,
+        "sh",
+        &list,
+    ]);
+    a.extend(packages);
+    a
 }
 
 pub fn check(
@@ -76,6 +105,9 @@ pub fn check(
     if !ok(in_box(argv(&["test", "-x", &resolve]))) {
         problems.push(Problem::ResolveMissing);
         return problems;
+    }
+    if !ok(in_box(packages_probe(recipe, vendor))) {
+        problems.push(Problem::PackagesOutdated);
     }
     if let Some(probe) = vendor.and_then(gpu_probe) {
         if !ok(in_box(probe)) {
@@ -153,7 +185,16 @@ mod tests {
     fn reports_launcher_and_gpu_problems() {
         let r = FakeRunner::default()
             .respond(
-                &["distrobox", "enter", "--name", "vinci-free", "--", "sh"],
+                &[
+                    "distrobox",
+                    "enter",
+                    "--name",
+                    "vinci-free",
+                    "--",
+                    "sh",
+                    "-c",
+                    "clinfo -l | grep -q Platform",
+                ],
                 "",
                 false,
             )
@@ -176,5 +217,59 @@ mod tests {
         let p = run(&r, "noresolve", true, Vendor::Nvidia);
         assert_eq!(p, [Problem::ResolveMissing]);
         assert_eq!(p[0].repair(), Repair::Reinstall);
+    }
+
+    #[test]
+    fn container_from_an_older_recipe_needs_its_packages_updated() {
+        let r = FakeRunner::default()
+            .respond(
+                &[
+                    "distrobox",
+                    "enter",
+                    "--name",
+                    "vinci-free",
+                    "--",
+                    "sh",
+                    "-c",
+                ],
+                "",
+                false,
+            )
+            .respond(&[], "", true);
+        let p = run(&r, "packages", true, Vendor::Intel);
+        assert!(p.contains(&Problem::PackagesOutdated), "{p:?}");
+        assert_eq!(Problem::PackagesOutdated.repair(), Repair::UpdatePackages);
+        let probe = r
+            .calls()
+            .into_iter()
+            .find(|c| c.iter().any(|a| a.contains("dpkg-query")))
+            .unwrap();
+        assert!(probe.contains(&"/etc/apt/sources.list.d/intel-graphics.list".to_string()));
+        assert!(probe.contains(&"intel-opencl-icd".to_string()));
+        assert!(probe.contains(&"ffmpeg".to_string()), "base packages too");
+    }
+
+    /// The probe script against the real dpkg of this machine (Debian/Ubuntu only).
+    #[test]
+    fn packages_probe_script_works_with_real_dpkg() {
+        if std::process::Command::new("dpkg-query")
+            .arg("--version")
+            .output()
+            .is_err()
+        {
+            return;
+        }
+        let script = packages_probe(&Recipe::bundled(), None)[2].clone();
+        let run = |args: &[&str]| {
+            std::process::Command::new("sh")
+                .args(["-c", &script, "sh"])
+                .args(args)
+                .status()
+                .unwrap()
+                .success()
+        };
+        assert!(run(&["", "dpkg"]));
+        assert!(!run(&["", "dpkg", "surely-not-a-package-xyz"]));
+        assert!(!run(&["/nonexistent/repo.list", "dpkg"]));
     }
 }

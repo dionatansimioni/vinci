@@ -348,6 +348,24 @@ mod tests {
         );
     }
 
+    /// Without a VA-API driver ffmpeg can't open the GPU ("vaapi_device: Input/output
+    /// error"), and Ubuntu's own Intel OpenCL (23.43) is too old for Resolve.
+    #[test]
+    fn gpu_vendors_get_video_drivers_and_a_current_intel_opencl() {
+        let r = Recipe::bundled();
+        assert!(r.gpu.amd.packages.contains(&"mesa-va-drivers".to_string()));
+        let intel = &r.gpu.intel;
+        for p in ["intel-opencl-icd", "intel-media-va-driver", "libmfx-gen1.2"] {
+            assert!(intel.packages.contains(&p.to_string()), "{p}");
+        }
+        let repo = intel.apt_repo.as_ref().unwrap();
+        assert_eq!(
+            repo.url,
+            "https://ppa.launchpadcontent.net/kobuk-team/intel-graphics/ubuntu"
+        );
+        assert!(repo.key_url.ends_with("0x0C0E6AF955CE463C03FC51574D098D70AFBE5E1F"));
+    }
+
     #[test]
     fn distrobox_compatibility_window() {
         let d = Recipe::bundled().distrobox;

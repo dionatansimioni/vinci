@@ -5,7 +5,7 @@
 
 use crate::gpu::Vendor;
 use crate::installer_file::Edition;
-use crate::recipe::{Recipe, VendorSetup};
+use crate::recipe::{AptRepo, Recipe, VendorSetup};
 use std::path::Path;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -75,23 +75,77 @@ fn s(parts: &[&str]) -> Vec<String> {
 }
 
 /// Wraps a command to run as the user inside the container.
-fn in_box_user(t: &Target, name: &str, cmd: Vec<String>) -> Vec<String> {
-    let mut argv = s(&[t.distrobox, "enter", "--name", name, "--"]);
+fn in_box_user(distrobox: &str, name: &str, cmd: Vec<String>) -> Vec<String> {
+    let mut argv = s(&[distrobox, "enter", "--name", name, "--"]);
     argv.extend(cmd);
     argv
 }
 
 /// Wraps a command to run as root inside the container.
-fn in_box(t: &Target, name: &str, cmd: Vec<String>) -> Vec<String> {
+fn in_box(distrobox: &str, name: &str, cmd: Vec<String>) -> Vec<String> {
     let mut sudo = vec!["sudo".to_string()];
     sudo.extend(cmd);
-    in_box_user(t, name, sudo)
+    in_box_user(distrobox, name, sudo)
+}
+
+/// The apt packages the container needs (base + GPU vendor) and the vendor's extra
+/// repository, if any.
+pub fn requirements(recipe: &Recipe, vendor: Vendor) -> (Vec<String>, Option<&AptRepo>) {
+    let setup = vendor_setup(recipe, vendor);
+    let packages = recipe
+        .packages
+        .base
+        .iter()
+        .chain(setup.into_iter().flat_map(|v| &v.packages))
+        .cloned()
+        .collect();
+    (packages, setup.and_then(|v| v.apt_repo.as_ref()))
+}
+
+/// Adds the vendor repository and installs (or upgrades) every package. Part of the
+/// install plan, and run alone to bring an existing container up to a newer recipe.
+pub fn package_steps(recipe: &Recipe, vendor: Vendor, distrobox: &str, name: &str) -> Vec<Step> {
+    let (packages, repo) = requirements(recipe, vendor);
+    let mut steps = Vec::new();
+    if let Some(repo) = repo {
+        // Fields are validated by the recipe parser; the source line is passed as a
+        // positional argument so the shell never interprets it.
+        let script = r#"set -e; install -d -m 0755 /etc/apt/keyrings; curl -fsSL "$1" -o "$2"; printf '%s\n' "$3" > "/etc/apt/sources.list.d/$4.list""#;
+        steps.push(Step {
+            kind: StepKind::AddRepository,
+            argv: in_box(
+                distrobox,
+                name,
+                s(&[
+                    "sh",
+                    "-c",
+                    script,
+                    "sh",
+                    &repo.key_url,
+                    &repo.keyring_path(),
+                    &repo.source_line(),
+                    &repo.name,
+                ]),
+            ),
+        });
+    }
+    let mut install = s(&[
+        "sh",
+        "-c",
+        r#"set -e; export DEBIAN_FRONTEND=noninteractive; apt-get update --error-on=any; apt-get install -y --no-install-recommends "$@""#,
+        "sh",
+    ]);
+    install.extend(packages);
+    steps.push(Step {
+        kind: StepKind::InstallPackages,
+        argv: in_box(distrobox, name, install),
+    });
+    steps
 }
 
 /// Full install plan, in order.
 pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
     let name = container_name(recipe, t.edition);
-    let setup = vendor_setup(recipe, t.vendor);
     let mut steps = vec![Step {
         kind: StepKind::PullImage,
         argv: s(&["podman", "pull", &recipe.container.image]),
@@ -124,57 +178,17 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
     });
     steps.push(Step {
         kind: StepKind::Initialize,
-        argv: in_box_user(t, &name, s(&["sudo", "-n", "true"])),
+        argv: in_box_user(t.distrobox, &name, s(&["sudo", "-n", "true"])),
     });
 
-    if let Some(repo) = setup.and_then(|v| v.apt_repo.as_ref()) {
-        // Fields are validated by the recipe parser; the source line is passed as a
-        // positional argument so the shell never interprets it.
-        let script = r#"set -e; install -d -m 0755 /etc/apt/keyrings; curl -fsSL "$1" -o "$2"; printf '%s\n' "$3" > "/etc/apt/sources.list.d/$4.list""#;
-        steps.push(Step {
-            kind: StepKind::AddRepository,
-            argv: in_box(
-                t,
-                &name,
-                s(&[
-                    "sh",
-                    "-c",
-                    script,
-                    "sh",
-                    &repo.key_url,
-                    &repo.keyring_path(),
-                    &repo.source_line(),
-                    &repo.name,
-                ]),
-            ),
-        });
-    }
-
-    let packages: Vec<&str> = recipe
-        .packages
-        .base
-        .iter()
-        .chain(setup.into_iter().flat_map(|v| &v.packages))
-        .map(String::as_str)
-        .collect();
-    let mut install = s(&[
-        "sh",
-        "-c",
-        r#"set -e; export DEBIAN_FRONTEND=noninteractive; apt-get update --error-on=any; apt-get install -y --no-install-recommends "$@""#,
-        "sh",
-    ]);
-    install.extend(packages.iter().map(|p| p.to_string()));
-    steps.push(Step {
-        kind: StepKind::InstallPackages,
-        argv: in_box(t, &name, install),
-    });
+    steps.extend(package_steps(recipe, t.vendor, t.distrobox, &name));
 
     let run_file = if t.installer.extension().is_some_and(|e| e == "zip") {
         steps.push(Step {
             kind: StepKind::ExtractInstaller,
             // Inside the box: the host may lack unzip (or be a Flatpak sandbox).
             argv: in_box_user(
-                t,
+                t.distrobox,
                 &name,
                 // unzip -d does not create missing parents (~/.cache/vinci on a fresh system).
                 s(&[
@@ -209,12 +223,12 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
     run.extend(recipe.resolve.installer_args.iter().cloned());
     steps.push(Step {
         kind: StepKind::InstallResolve,
-        argv: in_box(t, &name, run),
+        argv: in_box(t.distrobox, &name, run),
     });
     steps.push(Step {
         kind: StepKind::Verify,
         argv: in_box_user(
-            t,
+            t.distrobox,
             &name,
             s(&[
                 "test",
@@ -237,7 +251,7 @@ pub fn install_plan(recipe: &Recipe, t: &Target) -> Vec<Step> {
         rm.extend(recipe.resolve.remove_libs.iter().cloned());
         steps.push(Step {
             kind: StepKind::RemoveConflictingLibs,
-            argv: in_box(t, &name, rm),
+            argv: in_box(t.distrobox, &name, rm),
         });
     }
     steps
