@@ -37,12 +37,23 @@ pub enum Error {
         kind: StepKind,
         source: std::io::Error,
     },
+    /// The user cancelled while `kind` was running (or about to run).
+    #[error("cancelled")]
+    Cancelled { kind: StepKind },
 }
 
 pub struct Context<'a> {
     pub recipe: &'a Recipe,
     pub distrobox: &'a str,
     pub container: &'a str,
+    /// Checked between steps; the runner stops the running step itself.
+    pub cancel: Option<&'a crate::cancel::Cancel>,
+}
+
+impl Context<'_> {
+    fn cancelled(&self) -> bool {
+        self.cancel.is_some_and(|c| c.is_cancelled())
+    }
 }
 
 fn run(runner: &dyn Runner, kind: StepKind, argv: &[String]) -> Result<Output, Error> {
@@ -108,6 +119,9 @@ pub fn execute(
     let total = steps.len();
     on(Event::Plan(steps.iter().map(|s| s.kind).collect()));
     for (index, step) in steps.iter().enumerate() {
+        if ctx.cancelled() {
+            return Err(Error::Cancelled { kind: step.kind });
+        }
         on(Event::Started {
             index,
             total,
@@ -120,6 +134,10 @@ pub fn execute(
                 kind: step.kind,
                 source,
             })?;
+        // A step killed by the cancel looks like a failure; never "recover" from it.
+        if ctx.cancelled() {
+            return Err(Error::Cancelled { kind: step.kind });
+        }
         let recovered = !out.success
             && match step.kind {
                 StepKind::PullImage => pull_from_mirrors(runner, ctx, on)?,
@@ -171,6 +189,7 @@ mod tests {
             recipe,
             distrobox: "distrobox",
             container: "vinci-free",
+            cancel: None,
         }
     }
 

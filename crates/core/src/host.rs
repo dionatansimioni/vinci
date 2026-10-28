@@ -75,12 +75,24 @@ pub trait Runner {
 
 pub struct HostRunner {
     pub mode: ExecMode,
+    /// When set, streamed commands run in their own process group so a cancel can stop
+    /// them with everything they started.
+    pub cancel: Option<crate::cancel::Cancel>,
 }
 
 impl HostRunner {
     pub fn new() -> Self {
         Self {
             mode: ExecMode::detect(),
+            cancel: None,
+        }
+    }
+
+    /// A runner whose streamed commands stop when `cancel` fires.
+    pub fn cancellable(cancel: crate::cancel::Cancel) -> Self {
+        Self {
+            cancel: Some(cancel),
+            ..Self::new()
         }
     }
 
@@ -95,7 +107,8 @@ impl HostRunner {
         argv: &[String],
         on_line: &mut dyn FnMut(&str),
     ) -> std::io::Result<Output> {
-        exec_streaming(&self.mode.wrap_root(argv), on_line)
+        // Never interrupted: killing a package manager halfway can break the system.
+        exec_streaming(&self.mode.wrap_root(argv), on_line, None)
     }
 
     /// Runs an argv that is already complete (no Flatpak wrapping) and returns stdout
@@ -141,26 +154,38 @@ impl Runner for HostRunner {
         argv: &[String],
         on_line: &mut dyn FnMut(&str),
     ) -> std::io::Result<Output> {
-        exec_streaming(&self.mode.wrap(argv), on_line)
+        exec_streaming(&self.mode.wrap(argv), on_line, self.cancel.as_ref())
     }
 }
 
 /// Runs an already-wrapped argv, forwarding each stdout/stderr line as it arrives while
 /// still collecting both for the result.
-fn exec_streaming(argv: &[String], on_line: &mut dyn FnMut(&str)) -> std::io::Result<Output> {
+fn exec_streaming(
+    argv: &[String],
+    on_line: &mut dyn FnMut(&str),
+    cancel: Option<&crate::cancel::Cancel>,
+) -> std::io::Result<Output> {
     use std::io::{BufRead, BufReader};
+    use std::os::unix::process::CommandExt;
     use std::process::Stdio;
     use std::sync::mpsc;
 
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| std::io::Error::other("empty command"))?;
-    let mut child = Command::new(program)
-        .args(args)
+    let mut cmd = Command::new(program);
+    cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+        .stderr(Stdio::piped());
+    if cancel.is_some() {
+        cmd.process_group(0);
+    }
+    crate::log::command(argv);
+    let mut child = cmd.spawn()?;
+    if let Some(c) = cancel {
+        c.set_running(Some(child.id()));
+    }
     let (tx, rx) = mpsc::channel::<(bool, String)>();
     let readers: Vec<_> = [
         (
@@ -182,6 +207,7 @@ fn exec_streaming(argv: &[String], on_line: &mut dyn FnMut(&str)) -> std::io::Re
     drop(tx);
     let (mut stdout, mut stderr) = (String::new(), String::new());
     for (is_err, line) in rx {
+        crate::log::output(&line);
         on_line(&line);
         let buf = if is_err { &mut stderr } else { &mut stdout };
         buf.push_str(&line);
@@ -190,7 +216,12 @@ fn exec_streaming(argv: &[String], on_line: &mut dyn FnMut(&str)) -> std::io::Re
     for r in readers {
         let _ = r.join();
     }
-    let status = child.wait()?;
+    let status = child.wait();
+    if let Some(c) = cancel {
+        c.set_running(None);
+    }
+    let status = status?;
+    crate::log::finished(status.code());
     Ok(Output {
         success: status.success(),
         code: status.code(),
@@ -204,7 +235,12 @@ fn exec(argv: &[String]) -> std::io::Result<Output> {
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| std::io::Error::other("empty command"))?;
+    crate::log::command(argv);
     let out = Command::new(program).args(args).output()?;
+    crate::log::finished(out.status.code());
+    if !out.status.success() {
+        crate::log::output(&String::from_utf8_lossy(&out.stderr));
+    }
     Ok(Output {
         success: out.status.success(),
         code: out.status.code(),
@@ -319,6 +355,7 @@ mod tests {
     fn streams_lines_from_both_pipes() {
         let r = HostRunner {
             mode: ExecMode::Direct,
+            cancel: None,
         };
         let mut seen = Vec::new();
         let out = r
@@ -341,6 +378,7 @@ mod tests {
     fn host_runner_runs_real_commands() {
         let r = HostRunner {
             mode: ExecMode::Direct,
+            cancel: None,
         };
         let out = r.run(&argv(&["echo", "ok"])).unwrap();
         assert!(out.success);

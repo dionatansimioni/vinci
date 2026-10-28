@@ -90,6 +90,7 @@ pub fn restore(
         recipe,
         distrobox,
         container: &previous.container,
+        cancel: None,
     };
     installer::execute(runner, &steps, &ctx, on)?;
     state.installation = Some(previous.clone());

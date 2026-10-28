@@ -3,6 +3,7 @@
 
 pub mod backup;
 pub mod blackmagic;
+pub mod cancel;
 pub mod container;
 pub mod convert;
 pub mod diagnostics;
@@ -18,6 +19,7 @@ pub mod installer_file;
 pub mod integrate;
 pub mod known_bad;
 pub mod launcher;
+pub mod log;
 pub mod progress;
 pub mod recipe;
 pub mod remote;

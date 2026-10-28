@@ -68,6 +68,29 @@ pub fn removable_tools(state: &State, runner: &dyn Runner, recipe: &Recipe) -> V
         .collect()
 }
 
+/// Removes tools Vinci installed: a private copy is deleted, a package goes through the
+/// package manager as root. Returns the names removed and the names that failed; the
+/// caller updates the state.
+pub fn remove_tools(
+    tools: &[InstalledTool],
+    run_root: &dyn Fn(&[String]) -> bool,
+    distro: &Distro,
+) -> (Vec<String>, Vec<String>) {
+    let (mut removed, mut failed) = (Vec::new(), Vec::new());
+    for tool in tools {
+        let ok = match &tool.source {
+            ToolSource::UserLocal { prefix } => {
+                std::fs::remove_dir_all(prefix).is_ok() || !prefix.exists()
+            }
+            ToolSource::PackageManager => distro
+                .package_manager()
+                .is_some_and(|pm| run_root(&pm.remove_command(&[&tool.name]))),
+        };
+        if ok { &mut removed } else { &mut failed }.push(tool.name.clone());
+    }
+    (removed, failed)
+}
+
 /// Runs the uninstall. Best effort: keeps going after a failed step and reports it.
 /// `run_root` runs a command as root (pkexec), used only to remove podman.
 pub fn uninstall(
@@ -122,22 +145,11 @@ pub fn uninstall(
         .filter(|t| opts.remove_tools.contains(&t.name))
         .cloned()
         .collect();
-    for tool in &to_remove {
-        let ok = match &tool.source {
-            ToolSource::UserLocal { prefix } => {
-                std::fs::remove_dir_all(prefix).is_ok() || !prefix.exists()
-            }
-            ToolSource::PackageManager => distro
-                .package_manager()
-                .is_some_and(|pm| run_root(&pm.remove_command(&[&tool.name]))),
-        };
-        if ok {
-            sum.removed_tools.push(tool.name.clone());
-            state.tools.retain(|t| t.name != tool.name);
-        } else {
-            sum.warnings.push(format!("tool {}", tool.name));
-        }
-    }
+    let (removed, failed) = remove_tools(&to_remove, run_root, distro);
+    state.tools.retain(|t| !removed.contains(&t.name));
+    sum.removed_tools = removed;
+    sum.warnings
+        .extend(failed.into_iter().map(|name| format!("tool {name}")));
 
     // Vinci's own folders go last: the private distrobox may live inside them.
     for dir in vinci_dirs(home) {

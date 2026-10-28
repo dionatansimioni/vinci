@@ -143,6 +143,7 @@ mod tests {
         let data = tmp("realtools");
         let runner = crate::host::HostRunner {
             mode: crate::host::ExecMode::Direct,
+            cancel: None,
         };
         install(&runner, &Recipe::bundled(), "/nonexistent/distrobox", "c", &data, "[Desktop Entry]\nType=Application\nName=X\nExec=true\nMimeType=application/x-resolveproj;\n").unwrap();
         let globs = std::fs::read_to_string(data.join("mime/globs2")).unwrap_or_default();

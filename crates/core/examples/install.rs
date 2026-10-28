@@ -1,6 +1,9 @@
 //! Developer tool: the full install exactly as the app runs it, with real commands.
 //!
-//! cargo run -p rli-core --example install -- <installer.zip|.run>
+//! cargo run -p rli-core --example install -- <installer.zip|.run> [--cancel-at STEP SECS]
+//!
+//! `--cancel-at InstallResolve 20` presses "Cancel" 20 s after that step starts, to
+//! check that the running command stops and what was created is removed.
 
 use rli_core::flow::{self, Request};
 use rli_core::host::HostRunner;
@@ -21,8 +24,15 @@ fn main() {
         kind,
     };
 
+    let args: Vec<String> = std::env::args().collect();
+    let cancel_at = args
+        .iter()
+        .position(|a| a == "--cancel-at")
+        .map(|i| (args[i + 1].clone(), args[i + 2].parse::<u64>().unwrap()));
+    let cancel = rli_core::cancel::Cancel::default();
+
     let recipe = Recipe::bundled();
-    let runner = HostRunner::new();
+    let runner = HostRunner::cancellable(cancel.clone());
     let home = state::home();
     let host = tools::detect(&runner, &recipe, &home);
     let distrobox = host
@@ -50,8 +60,27 @@ fn main() {
             state_path: &state::State::default_path(),
             keep_installer: true,
             keep_restore_point: true,
+            cancel: Some(&cancel),
         },
-        &mut |e| println!("{e:?}"),
+        &mut |e| {
+            if let rli_core::installer::Event::Started { kind, .. } = &e {
+                if let Some((step, secs)) = cancel_at
+                    .as_ref()
+                    .filter(|(s, _)| *s == format!("{kind:?}"))
+                {
+                    println!("will cancel {secs} s into {step}");
+                    let (c, secs) = (cancel.clone(), *secs);
+                    std::thread::spawn(move || {
+                        std::thread::sleep(std::time::Duration::from_secs(secs));
+                        println!("CANCEL");
+                        c.cancel();
+                    });
+                }
+            }
+            if !matches!(e, rli_core::installer::Event::Output(_)) {
+                println!("{e:?}");
+            }
+        },
     );
     match out {
         Ok(o) => println!("installed {:?}, replaced {:?}", o.installation, o.replaced),

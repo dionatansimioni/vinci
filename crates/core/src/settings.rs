@@ -22,6 +22,8 @@ pub struct Settings {
     /// Watch folders; `None` disables each one.
     pub watch_import: Option<PathBuf>,
     pub watch_export: Option<PathBuf>,
+    /// Keep a local activity log (`log::default_path`). Off unless the user turns it on.
+    pub save_logs: bool,
 }
 
 impl Default for Settings {
@@ -34,6 +36,7 @@ impl Default for Settings {
             background_service: true,
             watch_import: None,
             watch_export: None,
+            save_logs: false,
         }
     }
 }
