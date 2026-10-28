@@ -536,3 +536,6 @@ msgstr "Configurado: dongle do Studio, Speed Editor e painéis"
 
 msgid "USB devices set up. Reconnect the dongle or panel if it was already plugged in."
 msgstr "Dispositivos USB configurados. Reconecte o dongle ou o painel se já estava conectado."
+
+msgid "Update or reinstall"
+msgstr "Atualizar ou reinstalar"

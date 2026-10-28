@@ -977,6 +977,11 @@ impl Component for App {
             w.check_rows.push(row);
         }
         w.proceed.set_sensitive(!self.report.is_blocked());
+        w.proceed.set_label(&if self.installed.is_some() {
+            tr("Update or reinstall")
+        } else {
+            tr("Continue")
+        });
 
         for row in w.source_rows.drain(..) {
             w.source_group.remove(&row);
