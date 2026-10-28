@@ -1,4 +1,4 @@
-# Status (2026-10-28)
+# Status (2026-10-28, versão 0.2.0)
 
 ## Pronto e testado
 
@@ -23,6 +23,14 @@
 | Preferências (idioma, GPU, restauração, instalador, pastas) | ✅ unitário + tela real |
 | Serviço de pastas monitoradas (`vinci --watch`) + autostart | ✅ real (conversão, sem reconversão, desligamento, instância única) |
 | Regras udev (dongle, Speed Editor, painéis) com validação de segurança | ✅ unitário + regras reais validadas |
+| Barra de progresso também na instalação do podman/distrobox | ✅ unitário; ✅ real (distrobox reinstalado pela interface) |
+| Menu principal com Preferências e "Sobre o Vinci" | ✅ tela real |
+| Ícone na barra de tarefas (ícone da janela + atalho próprio da AppImage) | ✅ unitário; ⏳ conferir no KDE/GNOME reais |
+| Botões minimizar/maximizar/fechar em qualquer desktop | ✅ unitário + Xvfb; ⏳ conferir no KDE real |
+| Conclusão → "Abrir" volta à visão da instalação sem reiniciar | ✅ real |
+| Mídia: "Mostrar na pasta" e aviso de tamanho por perfil | ✅ unitário + conversão real |
+| Preferências > Avançado: terminal no container e pasta da instalação | ✅ unitário; terminal conferido com shell real no container |
+| AppImage com a versão no nome (`Vinci-<versão>-x86_64.AppImage`) | ✅ teste de consistência versão/metainfo |
 
 ## Pendente
 

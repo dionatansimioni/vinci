@@ -17,4 +17,4 @@ diretórios XDG **do host** (`HOST_XDG_DATA_HOME`).
 
 ## AppImage (plano B)
 
-`build-aux/appimage/build.sh` compila dentro de um container Ubuntu 24.04 e empacota com linuxdeploy + plugin GTK (versões fixadas). `build-aux/appimage/smoke-test.sh` abre o resultado num Ubuntu 24.04 limpo, sem GTK/libadwaita, e falha se a janela não abrir ou se algum ícone não carregar.
+`build-aux/appimage/build.sh` gera `out/Vinci-<versão>-x86_64.AppImage`, com a versão do `Cargo.toml`: suba a versão (e acrescente um `<release>` no metainfo, o teste exige) a cada build distribuída, para a mais recente ser sempre óbvia. Ele compila dentro de um container Ubuntu 24.04 e empacota com linuxdeploy + plugin GTK (versões fixadas). `build-aux/appimage/smoke-test.sh` abre o resultado num Ubuntu 24.04 limpo, sem GTK/libadwaita, e falha se a janela não abrir ou se algum ícone não carregar.
