@@ -48,6 +48,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.3.0" date="2026-10-28">
+      <description>
+        <p>Cancel an installation and remove what it created, optional local activity log, newer Intel GPU drivers, hardware video drivers for AMD and Intel, automatic fallback to the CPU when a GPU encoder fails, and an update action for containers made by older versions.</p>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-10-28">
       <description>
         <p>Progress bar while installing podman and distrobox, About dialog, terminal in the container, button to show converted files, size warnings for conversion presets, window buttons on every desktop and the app icon in the taskbar.</p>

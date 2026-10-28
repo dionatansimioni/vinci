@@ -1,4 +1,4 @@
-# Status (2026-10-28, versão 0.2.0)
+# Status (2026-10-28, versão 0.3.0)
 
 ## Pronto e testado
 
@@ -31,6 +31,12 @@
 | Mídia: "Mostrar na pasta" e aviso de tamanho por perfil | ✅ unitário + conversão real |
 | Preferências > Avançado: terminal no container e pasta da instalação | ✅ unitário; terminal conferido com shell real no container |
 | AppImage com a versão no nome (`Vinci-<versão>-x86_64.AppImage`) | ✅ teste de consistência versão/metainfo |
+| Cancelar a instalação (para o passo em andamento e desfaz: container, imagem baixada, podman/distrobox instalados agora; reinstalação volta pelo ponto de restauração) | ✅ unitário; ✅ real (ver abaixo) |
+| Logs de atividade locais (desligados por padrão, nome de usuário oculto, limite de 5 MB) | ✅ unitário |
+| Conversão: teste rápido de cada encoder de GPU + volta automática para a CPU | ✅ unitário; ⏳ conferir no Ryzen real |
+| Drivers VA-API no container (AMD: mesa-va-drivers; Intel: intel-media-va-driver + QSV) | ✅ instalados num container limpo |
+| Intel: OpenCL 26.x do PPA da equipe Ubuntu/Intel (o 23.43 do Ubuntu é anterior ao compartilhamento OpenCL/OpenGL que o Resolve usa) | ✅ instalado num container limpo; ⏳ conferir no Alder Lake real |
+| Autodiagnóstico detecta container de receita antiga → botão "Atualizar" (sem reinstalar) | ✅ unitário + script real com dpkg |
 
 ## Pendente
 
