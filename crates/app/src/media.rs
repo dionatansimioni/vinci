@@ -9,7 +9,7 @@ use relm4::prelude::*;
 use rli_core::convert::{self, Engine};
 use rli_core::ffmpeg::{self, Encoder, ExportPreset, ImportPreset, VideoCodec};
 use rli_core::gpu::Gpu;
-use rli_core::host::{HostRunner, Runner};
+use rli_core::host::HostRunner;
 use rli_core::recipe::Recipe;
 use rli_core::state::{self, State};
 use rli_core::tools;
@@ -136,26 +136,12 @@ fn engine() -> Option<(Engine, State)> {
     ))
 }
 
-pub fn pick_export_encoder(engine: &Engine, codec: VideoCodec, gpu: Option<&Gpu>) -> Encoder {
-    let argv: Vec<String> = ["ffmpeg", "-hide_banner", "-encoders"]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
-    let argv = match engine {
-        Engine::Container {
-            distrobox,
-            container,
-        } => convert::in_container(distrobox, container, &argv),
-        Engine::Direct => argv,
-    };
-    let available = HostRunner::new()
-        .run(&argv)
-        .map(|o| ffmpeg::parse_encoders(&o.stdout))
-        .unwrap_or_default();
+/// Encoders that pass a test encode in the container, best first (CPU last).
+pub fn export_encoders(engine: &Engine, codec: VideoCodec, gpu: Option<&Gpu>) -> Vec<Encoder> {
     let node = gpu
         .and_then(|g| g.render_node.as_ref())
         .map(|n| PathBuf::from(format!("/dev/dri/{n}")));
-    ffmpeg::pick_encoder(codec, gpu.map(|g| g.vendor), node.as_deref(), &available)
+    convert::working_encoders(engine, codec, gpu.map(|g| g.vendor), node.as_deref())
 }
 
 impl Component for Media {
@@ -363,28 +349,28 @@ impl Component for Media {
                 let choice = CHOICES[self.choice];
                 let gpu = self.gpu.clone();
                 sender.spawn_command(move |out| {
-                    let encoder = match choice {
-                        Choice::Export(p) => Some(pick_export_encoder(
-                            &engine,
-                            p.settings().codec,
-                            gpu.as_ref(),
-                        )),
-                        Choice::Import(_) => None,
+                    let encoders = match choice {
+                        Choice::Export(p) => {
+                            export_encoders(&engine, p.settings().codec, gpu.as_ref())
+                        }
+                        Choice::Import(_) => Vec::new(),
                     };
                     for (i, input) in todo {
                         let dir = input.parent().map(PathBuf::from).unwrap_or_default();
-                        let command = match (choice, &encoder) {
-                            (Choice::Import(p), _) => ffmpeg::import_command(&input, &dir, p),
-                            (Choice::Export(p), Some(e)) => {
-                                ffmpeg::export_command(&input, &dir, p, e)
-                            }
-                            (Choice::Export(p), None) => {
-                                ffmpeg::export_command(&input, &dir, p, &Encoder::Cpu)
-                            }
-                        };
-                        let result = convert::convert_file(&engine, command, &input, |f| {
+                        let progress = |f| {
                             let _ = out.send(MediaCmd::Progress(i, f));
-                        })
+                        };
+                        let result = match choice {
+                            Choice::Import(p) => convert::convert_file(
+                                &engine,
+                                ffmpeg::import_command(&input, &dir, p),
+                                &input,
+                                progress,
+                            ),
+                            Choice::Export(p) => convert::convert_export(
+                                &engine, &input, &dir, p, &encoders, progress,
+                            ),
+                        }
                         .map_err(|e| match e {
                             convert::ConvertError::Failed { stderr } => {
                                 stderr.lines().rev().take(3).collect::<Vec<_>>().join(" · ")

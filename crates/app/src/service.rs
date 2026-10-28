@@ -4,7 +4,7 @@
 
 use crate::i18n::tr;
 use rli_core::convert::{self, Engine};
-use rli_core::ffmpeg::{self, Encoder, ImportPreset};
+use rli_core::ffmpeg::{self, Encoder, ImportPreset, VideoCodec};
 use rli_core::host::HostRunner;
 use rli_core::recipe::Recipe;
 use rli_core::settings::Settings;
@@ -148,7 +148,8 @@ pub fn run() -> i32 {
 
     let done_path = Done::default_path();
     let mut done = Done::load(&done_path);
-    let mut encoder: Option<Encoder> = None;
+    // Probing encoders takes a few seconds; do it once per codec.
+    let mut encoders: Option<(VideoCodec, Vec<Encoder>)> = None;
     while !quit.load(Ordering::Relaxed) {
         let settings = Settings::load(&Settings::default_path());
         if !settings.background_service
@@ -178,21 +179,29 @@ pub fn run() -> i32 {
                 .to_string_lossy()
                 .into_owned();
             let _ = std::fs::create_dir_all(&job.out_dir);
-            let command = match job.kind {
-                Kind::Import(p) => ffmpeg::import_command(&job.input, &job.out_dir, p),
-                Kind::Export(p) => {
-                    let enc = encoder.get_or_insert_with(|| {
-                        crate::media::pick_export_encoder(&engine, p.settings().codec, gpu.as_ref())
-                    });
-                    ffmpeg::export_command(&job.input, &job.out_dir, p, enc)
-                }
-            };
             set_status(format!("{} {name}", tr("Converting")));
-            let result = convert::convert_file(&engine, command, &job.input, |f| {
+            let progress = |f: Option<f64>| {
                 if let Some(f) = f {
                     set_status(format!("{} {name} ({:.0}%)", tr("Converting"), f * 100.0));
                 }
-            });
+            };
+            let result = match job.kind {
+                Kind::Import(p) => convert::convert_file(
+                    &engine,
+                    ffmpeg::import_command(&job.input, &job.out_dir, p),
+                    &job.input,
+                    progress,
+                ),
+                Kind::Export(p) => {
+                    let codec = p.settings().codec;
+                    if encoders.as_ref().is_none_or(|(c, _)| *c != codec) {
+                        let found = crate::media::export_encoders(&engine, codec, gpu.as_ref());
+                        encoders = Some((codec, found));
+                    }
+                    let list = encoders.as_ref().map(|(_, e)| e.as_slice()).unwrap_or(&[]);
+                    convert::convert_export(&engine, &job.input, &job.out_dir, p, list, progress)
+                }
+            };
             match result {
                 Ok(out) => notify(
                     &tr("Conversion finished"),

@@ -8,6 +8,7 @@ use relm4::adw::prelude::*;
 use relm4::gtk;
 use relm4::gtk::gio;
 use relm4::prelude::*;
+use rli_core::cancel::Cancel;
 use rli_core::distro::Distro;
 use rli_core::flow::{self, Outcome};
 use rli_core::gpu::Gpu;
@@ -18,7 +19,7 @@ use rli_core::installer::Event;
 use rli_core::installer_file::{self, parse_filename, InstallerFile};
 use rli_core::recipe::Recipe;
 use rli_core::remote::{self, UpdateInfo};
-use rli_core::state::{self, State, ToolSource};
+use rli_core::state::{self, InstalledTool, State, ToolSource};
 use rli_core::tools::{self, Action};
 use rli_core::{diagnostics, integrate, launcher};
 use std::path::PathBuf;
@@ -49,6 +50,14 @@ impl Page {
 
 /// What the progress page shows; the bar itself is computed from it on every tick.
 struct Progress {
+    title: String,
+    /// Stops the job; `None` for jobs that must not be interrupted (package updates).
+    cancel: Option<Cancel>,
+    cancelling: bool,
+    /// Tools installed by this job (podman, distrobox); removed again if it is cancelled.
+    new_tools: Vec<InstalledTool>,
+    /// The edition being installed, to warn when cancelling would replace it.
+    edition: Option<rli_core::installer_file::Edition>,
     plan: Vec<rli_core::container::StepKind>,
     /// Host tool steps at the front of `plan`; the container plan's indices start after.
     host_steps: usize,
@@ -64,6 +73,11 @@ impl Progress {
     fn new(step: String) -> Self {
         let now = std::time::Instant::now();
         Self {
+            title: tr("Installing DaVinci Resolve"),
+            cancel: Some(Cancel::default()),
+            cancelling: false,
+            new_tools: Vec::new(),
+            edition: None,
             plan: Vec::new(),
             host_steps: 0,
             index: 0,
@@ -147,6 +161,8 @@ pub enum Msg {
         tools: Vec<String>,
     },
     CopyReport,
+    AskCancel,
+    CancelInstall,
     Back,
     Tick,
 }
@@ -162,6 +178,13 @@ pub enum Cmd {
     Health(Vec<Problem>),
     Restored(Result<rli_core::state::Installation, String>),
     UsbConfigured(Result<usize, String>),
+    /// Host tools are in place (those listed were installed now); go on with Resolve.
+    HostDone(Vec<InstalledTool>, InstallerFile),
+    /// The job stopped on the user's request; these tools from this run must go too.
+    Cancelled(Vec<InstalledTool>),
+    /// Cleanup after a cancel finished; names of tools that could not be removed.
+    CancelCleaned(Vec<String>),
+    PackagesUpdated(Result<(), (String, String)>),
 }
 
 pub struct Widgets {
@@ -180,6 +203,8 @@ pub struct Widgets {
     source_group: adw::PreferencesGroup,
     source_rows: Vec<adw::ActionRow>,
     watch_label: gtk::Label,
+    progress_status: adw::StatusPage,
+    cancel_button: gtk::Button,
     progress_bar: gtk::ProgressBar,
     progress_label: gtk::Label,
     progress_activity: gtk::Label,
@@ -483,19 +508,21 @@ impl Component for App {
             .margin_top(12)
             .css_classes(["dim-label"])
             .build();
+        let progress_status = adw::StatusPage::builder()
+            .icon_name("system-software-install-symbolic")
+            .description(tr(
+                "This takes a few minutes. You can keep using your computer.",
+            ))
+            .build();
+        let cancel_button = button(&tr("Cancel"), &["pill"]);
+        cancel_button.connect_clicked(input(|| Msg::AskCancel));
         let progress_page = page_box(&[
-            adw::StatusPage::builder()
-                .icon_name("system-software-install-symbolic")
-                .title(tr("Installing DaVinci Resolve"))
-                .description(tr(
-                    "This takes a few minutes. You can keep using your computer.",
-                ))
-                .build()
-                .upcast_ref(),
+            progress_status.upcast_ref(),
             progress_bar.upcast_ref(),
             step_row.upcast_ref(),
             progress_activity.upcast_ref(),
             progress_time.upcast_ref(),
+            button_row(&[&cancel_button]).upcast_ref(),
         ]);
 
         // Done page
@@ -620,6 +647,8 @@ impl Component for App {
             source_group,
             source_rows: Vec::new(),
             watch_label,
+            progress_status,
+            cancel_button,
             progress_bar,
             progress_label,
             progress_activity,
@@ -634,7 +663,10 @@ impl Component for App {
 
     fn update(&mut self, msg: Msg, sender: ComponentSender<Self>, root: &Self::Root) {
         match msg {
-            Msg::Recheck => (self.report, self.gpus, self.distro) = probe(),
+            Msg::Recheck => {
+                (self.report, self.gpus, self.distro) = probe();
+                sender.input(Msg::RunHealth);
+            }
             Msg::Proceed => {
                 self.refresh_installers();
                 self.page = Page::Source;
@@ -698,6 +730,7 @@ impl Component for App {
             Msg::About => crate::about::present(root, self.diagnostic_report()),
             Msg::SetupHost(actions, file) => self.setup_host(actions, file, &sender),
             Msg::SettingsChanged => {
+                crate::apply_log_setting(&settings());
                 apply_gpu_choice(&mut self.report, &self.gpus);
                 sync_background_service();
             }
@@ -815,6 +848,18 @@ impl Component for App {
                 });
             }
             Msg::Repair(Repair::Reinstall) => sender.input(Msg::Proceed),
+            Msg::Repair(Repair::UpdatePackages) => self.update_packages(&sender),
+            Msg::AskCancel => self.ask_cancel(&sender, root),
+            Msg::CancelInstall => {
+                if let Some(c) = &self.progress.cancel {
+                    self.progress.cancelling = true;
+                    self.progress.step = tr("Cancelling and removing what was created…");
+                    self.progress.activity.clear();
+                    let c = c.clone();
+                    // Killing the running step can take a moment; keep the UI responsive.
+                    std::thread::spawn(move || c.cancel());
+                }
+            }
             Msg::Repair(Repair::Explain) => {}
             Msg::Repair(Repair::RecreateLauncher) => {
                 let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
@@ -923,6 +968,7 @@ impl Component for App {
                     String::new()
                 };
             }
+            Cmd::Progress(Event::Started { .. }) if self.progress.cancelling => {}
             Cmd::Progress(Event::Started { index, kind, .. }) => {
                 self.progress.index = self.progress.host_steps + index;
                 self.progress.step = messages::step(kind);
@@ -931,7 +977,8 @@ impl Component for App {
             }
             Cmd::Progress(Event::Output(line)) => {
                 let line = clean_line(&line);
-                if !line.is_empty() {
+                // Lines still in flight from the stopped step would hide "Cancelling…".
+                if !line.is_empty() && !self.progress.cancelling {
                     self.progress.activity = line;
                 }
             }
@@ -1003,6 +1050,67 @@ impl Component for App {
                 self.page = Page::Done;
             }
             Cmd::Finished(Err(e)) => {
+                self.progress.running.store(false, Ordering::Relaxed);
+                rli_core::log::info(&format!("Failed: {} {}", e.0, e.1));
+                self.error = Some(e);
+                self.page = Page::Failed;
+            }
+            Cmd::HostDone(tools, file) => {
+                self.progress.new_tools = tools;
+                self.start_install(file, &sender);
+            }
+            Cmd::Cancelled(tools) => {
+                let mut tools = tools;
+                tools.extend(std::mem::take(&mut self.progress.new_tools));
+                rli_core::log::info("Installation cancelled by the user");
+                if tools.is_empty() {
+                    sender.oneshot_command(async { Cmd::CancelCleaned(Vec::new()) });
+                } else {
+                    let distro = self.distro.clone().unwrap_or_else(|| Distro::parse(""));
+                    sender.spawn_command(move |out| {
+                        let runner = HostRunner::new();
+                        let (removed, failed) = rli_core::uninstall::remove_tools(
+                            &tools,
+                            &|argv: &[String]| runner.run_root(argv).is_ok_and(|o| o.success),
+                            &distro,
+                        );
+                        let path = State::default_path();
+                        let mut st = State::load(&path).unwrap_or_default();
+                        st.tools.retain(|t| !removed.contains(&t.name));
+                        let _ = st.save(&path);
+                        let _ = out.send(Cmd::CancelCleaned(failed));
+                    });
+                }
+            }
+            Cmd::CancelCleaned(failed) => {
+                self.progress.running.store(false, Ordering::Relaxed);
+                self.page = Page::Check;
+                self.installed = State::load(&State::default_path())
+                    .ok()
+                    .and_then(|s| s.installation);
+                self.backup = State::load(&State::default_path())
+                    .ok()
+                    .and_then(|s| s.backup);
+                let text = if failed.is_empty() {
+                    tr("Installation cancelled. What it had created was removed.")
+                } else {
+                    format!(
+                        "{} {}",
+                        tr("Installation cancelled. Could not remove:"),
+                        failed.join(", ")
+                    )
+                };
+                self.toasts.add_toast(adw::Toast::new(&text));
+                sender.input(Msg::RunHealth);
+            }
+            Cmd::PackagesUpdated(Ok(())) => {
+                self.progress.running.store(false, Ordering::Relaxed);
+                self.page = Page::Check;
+                self.toasts
+                    .add_toast(adw::Toast::new(&tr("The Resolve container is up to date.")));
+                sender.input(Msg::RunHealth);
+            }
+            Cmd::PackagesUpdated(Err(e)) => {
                 self.progress.running.store(false, Ordering::Relaxed);
                 self.error = Some(e);
                 self.page = Page::Failed;
@@ -1087,7 +1195,12 @@ impl Component for App {
             row.add_prefix(&gtk::Image::from_icon_name("dialog-warning-symbolic"));
             let repair = p.repair();
             if repair != Repair::Explain {
-                let b = button(&tr("Repair"), &[]);
+                let label = if repair == Repair::UpdatePackages {
+                    tr("Update")
+                } else {
+                    tr("Repair")
+                };
+                let b = button(&label, &[]);
                 b.set_valign(gtk::Align::Center);
                 let sender = _sender.clone();
                 b.connect_clicked(move |_| sender.input(Msg::Repair(repair)));
@@ -1157,6 +1270,9 @@ impl Component for App {
         });
 
         let p = &self.progress;
+        w.progress_status.set_title(&p.title);
+        w.cancel_button.set_visible(p.cancel.is_some());
+        w.cancel_button.set_sensitive(!p.cancelling);
         let est = rli_core::progress::estimate(&p.plan, p.index, p.step_started.elapsed());
         w.progress_bar.set_fraction(est.fraction);
         w.progress_label.set_label(&p.step);
@@ -1336,10 +1452,11 @@ impl App {
         let kinds: Vec<_> = actions.iter().filter_map(Action::step_kind).collect();
         self.progress.host_steps = kinds.len();
         self.progress.plan = kinds;
-        let input = sender.input_sender().clone();
+        self.progress.edition = Some(file.edition);
+        let cancel = self.progress.cancel.clone().unwrap_or_default();
         sender.spawn_command(move |out| {
             let mut last_line = std::time::Instant::now() - Duration::from_secs(1);
-            let result = run_host_actions(&actions, &mut |e| match e {
+            let result = run_host_actions(&actions, &cancel, &mut |e| match e {
                 HostEvent::Started(i, kind) => {
                     let _ = out.send(Cmd::HostStep(i, kind));
                 }
@@ -1350,12 +1467,11 @@ impl App {
                     }
                 }
             });
-            match result {
-                Ok(()) => input.emit(Msg::StartInstall(file)),
-                Err(e) => {
-                    let _ = out.send(Cmd::Finished(Err(e)));
-                }
-            }
+            let _ = out.send(match result {
+                Ok(tools) => Cmd::HostDone(tools, file),
+                Err(HostError::Cancelled(tools)) => Cmd::Cancelled(tools),
+                Err(HostError::Failed(e)) => Cmd::Finished(Err(e)),
+            });
         });
     }
 
@@ -1385,10 +1501,96 @@ impl App {
         if !self.progress.running.load(Ordering::Relaxed) {
             self.show_progress(sender);
         }
+        self.progress.edition = Some(file.edition);
+        let cancel = self.progress.cancel.clone().unwrap_or_default();
         let gpus = self.gpus.clone();
         sender.spawn_command(move |out| {
-            let result = install_blocking(&file, &gpus, &gpu, &out);
-            let _ = out.send(Cmd::Finished(result));
+            let result = install_blocking(&file, &gpus, &gpu, &cancel, &out);
+            let _ = out.send(match result {
+                Err(_) if cancel.is_cancelled() => Cmd::Cancelled(Vec::new()),
+                other => Cmd::Finished(other),
+            });
+        });
+    }
+
+    /// Asks before stopping: what was created so far is removed, and a reinstall over the
+    /// same edition without a restore point loses the version that was there.
+    fn ask_cancel(&self, sender: &ComponentSender<Self>, root: &adw::ApplicationWindow) {
+        let mut body = tr("Vinci will stop and remove what this installation created so far.");
+        let recipe = Recipe::bundled();
+        let replaces = self.progress.edition.is_some_and(|e| {
+            self.installed
+                .as_ref()
+                .is_some_and(|i| i.container == rli_core::container::container_name(&recipe, e))
+        });
+        if replaces && !settings().keep_restore_point {
+            body.push_str("\n\n");
+            body.push_str(&tr("Restore points are off, so the version you had installed will need to be installed again."));
+        }
+        if self
+            .progress
+            .new_tools
+            .iter()
+            .any(|t| t.source == ToolSource::PackageManager)
+        {
+            body.push_str("\n\n");
+            body.push_str(&tr(
+                "Podman, installed a moment ago, will be removed too (asks for your password).",
+            ));
+        }
+        let dialog = adw::AlertDialog::new(Some(&tr("Cancel the installation?")), Some(&body));
+        dialog.add_response("continue", &tr("Keep installing"));
+        dialog.add_response("cancel", &tr("Cancel installation"));
+        dialog.set_response_appearance("cancel", adw::ResponseAppearance::Destructive);
+        dialog.set_default_response(Some("continue"));
+        dialog.set_close_response("continue");
+        let sender = sender.clone();
+        dialog.connect_response(None, move |_, response| {
+            if response == "cancel" {
+                sender.input(Msg::CancelInstall);
+            }
+        });
+        dialog.present(Some(root));
+    }
+
+    /// Brings the existing container up to the current recipe (new GPU driver, video
+    /// drivers). Not cancellable: stopping apt halfway would leave it broken.
+    fn update_packages(&mut self, sender: &ComponentSender<Self>) {
+        let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned()) else {
+            return;
+        };
+        self.show_progress(sender);
+        self.progress.title = tr("Updating the Resolve container");
+        self.progress.cancel = None;
+        sender.spawn_command(move |out| {
+            let runner = HostRunner::new();
+            let recipe = Recipe::bundled();
+            let result = (|| {
+                let dbx = tools::detect(&runner, &recipe, &state::home())
+                    .distrobox
+                    .executable()
+                    .ok_or_else(|| (tr("distrobox is missing"), String::new()))?;
+                let steps =
+                    rli_core::container::package_steps(&recipe, gpu.vendor, &dbx, &inst.container);
+                let ctx = rli_core::installer::Context {
+                    recipe: &recipe,
+                    distrobox: &dbx,
+                    container: &inst.container,
+                    cancel: None,
+                };
+                let mut last_line = std::time::Instant::now() - Duration::from_secs(1);
+                rli_core::installer::execute(&runner, &steps, &ctx, &mut |e| {
+                    if let Event::Output(_) = &e {
+                        if last_line.elapsed() < Duration::from_millis(200) {
+                            return;
+                        }
+                        last_line = std::time::Instant::now();
+                    }
+                    let _ = out.send(Cmd::Progress(e));
+                })
+                .map_err(|e| step_error(flow::Error::Step(e)))
+            })();
+            let _ = out.send(Cmd::PackagesUpdated(result));
         });
     }
 }
@@ -1398,15 +1600,30 @@ enum HostEvent {
     Output(String),
 }
 
+enum HostError {
+    Failed((String, String)),
+    /// Stopped by the user; carries the tools this run had already installed.
+    Cancelled(Vec<InstalledTool>),
+}
+
+/// Installs the host tools, recording each in the state. Returns the ones installed.
+/// The podman step is never interrupted (the package manager must finish); a cancel
+/// during it takes effect right after.
 fn run_host_actions(
     actions: &[Action],
+    cancel: &Cancel,
     on: &mut dyn FnMut(HostEvent),
-) -> Result<(), (String, String)> {
-    let runner = HostRunner::new();
+) -> Result<Vec<InstalledTool>, HostError> {
+    let runner = HostRunner::cancellable(cancel.clone());
     let path = State::default_path();
     let mut st = State::load(&path).unwrap_or_default();
+    let mut installed = Vec::new();
     let steps = actions.iter().filter_map(|a| Some((a, a.step_kind()?)));
     for (i, (a, kind)) in steps.enumerate() {
+        if cancel.is_cancelled() {
+            let _ = st.save(&path);
+            return Err(HostError::Cancelled(installed));
+        }
         on(HostEvent::Started(i, kind));
         let mut line = |l: &str| on(HostEvent::Output(l.to_string()));
         let (out, tool, source) = match a {
@@ -1424,25 +1641,53 @@ fn run_host_actions(
             ),
             Action::ManualPodman { .. } => continue,
         };
-        let failed = |detail: String| Err((format!("{} {tool}", tr("Could not install")), detail));
+        if cancel.is_cancelled() {
+            // A distrobox copy cut off halfway is still ours to delete.
+            if out.as_ref().is_ok_and(|o| o.success)
+                || matches!(source, ToolSource::UserLocal { .. })
+            {
+                installed.push(InstalledTool {
+                    name: tool.into(),
+                    source: source.clone(),
+                });
+            }
+            if out.is_ok_and(|o| o.success) {
+                st.record_tool(tool, source);
+            }
+            let _ = st.save(&path);
+            return Err(HostError::Cancelled(installed));
+        }
+        let failed = |detail: String| {
+            Err(HostError::Failed((
+                format!("{} {tool}", tr("Could not install")),
+                detail,
+            )))
+        };
         match out {
-            Ok(o) if o.success => st.record_tool(tool, source),
+            Ok(o) if o.success => {
+                installed.push(InstalledTool {
+                    name: tool.into(),
+                    source: source.clone(),
+                });
+                st.record_tool(tool, source);
+            }
             Ok(o) => return failed(o.stderr),
             Err(e) => return failed(e.to_string()),
         }
     }
     let _ = st.save(&path);
-    Ok(())
+    Ok(installed)
 }
 
 fn install_blocking(
     file: &InstallerFile,
     gpus: &[Gpu],
     gpu: &Gpu,
+    cancel: &Cancel,
     out: &relm4::Sender<Cmd>,
 ) -> Result<Outcome, (String, String)> {
     let recipe = Recipe::bundled();
-    let runner = HostRunner::new();
+    let runner = HostRunner::cancellable(cancel.clone());
     let home = state::home();
     let host = tools::detect(&runner, &recipe, &home);
     let distrobox = host
@@ -1459,6 +1704,7 @@ fn install_blocking(
         state_path: &State::default_path(),
         keep_installer: settings().keep_installer,
         keep_restore_point: settings().keep_restore_point,
+        cancel: Some(cancel),
     };
     // apt prints thousands of lines; forward at most ~5 per second to keep the UI light.
     let mut last_line = std::time::Instant::now() - std::time::Duration::from_secs(1);
@@ -1471,16 +1717,19 @@ fn install_blocking(
         }
         let _ = out.send(Cmd::Progress(e));
     })
-    .map_err(|e| {
-        let details = match &e {
-            flow::Error::Step(rli_core::installer::Error::StepFailed { output, .. }) => {
-                let tail: Vec<&str> = output.stderr.lines().rev().take(20).collect();
-                tail.into_iter().rev().collect::<Vec<_>>().join("\n")
-            }
-            other => other.to_string(),
-        };
-        (messages::failure(&e), details)
-    })
+    .map_err(step_error)
+}
+
+/// Summary and details (the last lines the failed command printed) for the error page.
+fn step_error(e: flow::Error) -> (String, String) {
+    let details = match &e {
+        flow::Error::Step(rli_core::installer::Error::StepFailed { output, .. }) => {
+            let tail: Vec<&str> = output.stderr.lines().rev().take(20).collect();
+            tail.into_iter().rev().collect::<Vec<_>>().join("\n")
+        }
+        other => other.to_string(),
+    };
+    (messages::failure(&e), details)
 }
 
 #[cfg(test)]

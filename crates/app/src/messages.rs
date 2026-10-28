@@ -119,6 +119,9 @@ pub fn failure(e: &flow::Error) -> String {
         flow::Error::Step(rli_core::installer::Error::Spawn { .. }) => {
             tr("A required program could not be started.")
         }
+        flow::Error::Step(rli_core::installer::Error::Cancelled { .. }) => {
+            tr("The installation was cancelled.")
+        }
         flow::Error::Integrate(_) => {
             tr("Resolve was installed, but the menu entry could not be created.")
         }
@@ -148,6 +151,10 @@ pub fn problem(p: &rli_core::health::Problem) -> (String, String) {
             tr("The GPU is not visible to Resolve"),
             tr("This usually happens after a driver update. Restart the computer; if it persists, copy the diagnostic report and ask for help."),
         ),
+        Problem::PackagesOutdated => (
+            tr("The Resolve container needs an update"),
+            tr("This version of Vinci installs newer GPU and video drivers in it. Your projects and Resolve's settings are kept."),
+        ),
     }
 }
 
@@ -173,6 +180,25 @@ mod tests {
             render_node: None,
             amd_gfx_target: None,
         }
+    }
+
+    #[test]
+    fn every_problem_and_cancel_have_text() {
+        use rli_core::health::Problem;
+        for p in [
+            Problem::ContainerMissing,
+            Problem::ResolveMissing,
+            Problem::LauncherMissing,
+            Problem::GpuNotVisible,
+            Problem::PackagesOutdated,
+        ] {
+            let (title, body) = problem(&p);
+            assert!(!title.is_empty() && !body.is_empty(), "{p:?}");
+        }
+        let cancelled = flow::Error::Step(rli_core::installer::Error::Cancelled {
+            kind: StepKind::InstallResolve,
+        });
+        assert!(!failure(&cancelled).is_empty());
     }
 
     #[test]

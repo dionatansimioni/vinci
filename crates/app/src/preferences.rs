@@ -299,12 +299,50 @@ pub fn present(
         window.clone(),
     ));
 
+    let logs = adw::PreferencesGroup::builder().title(tr("Logs")).build();
+    let save_logs = switch(
+        tr("Save activity logs"),
+        tr("Off by default. Records the commands Vinci runs and what they print in a file on this computer, with your user name hidden. Nothing is sent anywhere; attach the file yourself when asking for help."),
+        |s| s.save_logs,
+        |s, v| s.save_logs = v,
+    );
+    logs.add(&save_logs);
+    let log_dir = rli_core::log::dir();
+    let open_logs = adw::ActionRow::builder()
+        .title(tr("Open the logs folder"))
+        .subtitle(log_dir.display().to_string())
+        .activatable(true)
+        .sensitive(log_dir.exists())
+        .build();
+    let open_logs_button = gtk::Button::from_icon_name("folder-open-symbolic");
+    open_logs_button.set_valign(gtk::Align::Center);
+    open_logs_button.add_css_class("flat");
+    open_logs.add_suffix(&open_logs_button);
+    open_logs.set_activatable_widget(Some(&open_logs_button));
+    open_logs_button.connect_clicked({
+        let (dir, window) = (log_dir.clone(), window.clone());
+        move |_| open_folder(&dir, window.as_ref())
+    });
+    // The app starts the log a moment later (on its settings message); make the folder
+    // now so the button works right away.
+    save_logs.connect_active_notify({
+        let open_logs = open_logs.clone();
+        move |r| {
+            if r.is_active() {
+                let _ = std::fs::create_dir_all(&log_dir);
+            }
+            open_logs.set_sensitive(log_dir.exists());
+        }
+    });
+    logs.add(&open_logs);
+
     let dialog = adw::PreferencesDialog::new();
     let page = adw::PreferencesPage::new();
     page.add(&general);
     page.add(&safety);
     page.add(&media);
     page.add(&advanced_group(installed, &dialog, window));
+    page.add(&logs);
     dialog.set_title(&tr("Preferences"));
     dialog.add(&page);
     dialog.present(Some(parent));
