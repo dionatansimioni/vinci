@@ -139,6 +139,27 @@ fn apply_gpu_choice(report: &mut Report, gpus: &[Gpu]) {
     }
 }
 
+/// Makes the session autostart match the settings and starts the service right away
+/// when it should run (it refuses to start twice).
+fn sync_background_service() {
+    use rli_core::watch;
+    let s = settings();
+    let exe = std::env::current_exe().unwrap_or_default();
+    let appimage = std::env::var("APPIMAGE").ok();
+    let in_flatpak = std::path::Path::new("/.flatpak-info").exists();
+    // Inside the sandbox the app relaunches itself directly; autostart uses `flatpak run`.
+    let command = watch::service_command(in_flatpak, appimage.as_deref(), &exe);
+    let _ = watch::sync_autostart(&s, &command, &watch::autostart_path());
+    if s.background_service && (s.watch_import.is_some() || s.watch_export.is_some()) {
+        let _ = std::process::Command::new(&exe)
+            .arg("--watch")
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .spawn();
+    }
+}
+
 fn settings() -> rli_core::settings::Settings {
     rli_core::settings::Settings::load(&rli_core::settings::Settings::default_path())
 }
@@ -455,6 +476,7 @@ impl Component for App {
             });
         }
         sender.input(Msg::RunHealth);
+        sync_background_service();
         let mut widgets = Widgets {
             installed_group,
             installed_row,
@@ -541,7 +563,10 @@ impl Component for App {
                     input.emit(Msg::SettingsChanged)
                 });
             }
-            Msg::SettingsChanged => apply_gpu_choice(&mut self.report, &self.gpus),
+            Msg::SettingsChanged => {
+                apply_gpu_choice(&mut self.report, &self.gpus);
+                sync_background_service();
+            }
             Msg::RemoveContainer(name) => {
                 sender.spawn_command(move |_| {
                     let _ = HostRunner::new().run(&[

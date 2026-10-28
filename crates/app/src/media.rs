@@ -106,7 +106,7 @@ fn engine() -> Option<(Engine, State)> {
     ))
 }
 
-fn pick_export_encoder(engine: &Engine, codec: VideoCodec, gpu: Option<&Gpu>) -> Encoder {
+pub fn pick_export_encoder(engine: &Engine, codec: VideoCodec, gpu: Option<&Gpu>) -> Encoder {
     let argv: Vec<String> = ["ffmpeg", "-hide_banner", "-encoders"]
         .iter()
         .map(|s| s.to_string())

@@ -11,3 +11,7 @@ rli-core = { path = "../core" }
 # gnome_46 = GTK 4.14 / libadwaita 1.5: the floor of Ubuntu 24.04 LTS, so AppImage builds run there.
 relm4 = { version = "0.11", features = ["libadwaita", "gnome_46"] }
 gettext-rs = { version = "0.8", features = ["gettext-system"] }
+# Tray icon (StatusNotifierItem) and notifications for the background service.
+ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
+notify-rust = "4"
+rustix = { version = "1", features = ["fs"] }

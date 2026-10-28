@@ -3,6 +3,7 @@ mod i18n;
 mod media;
 mod messages;
 mod preferences;
+mod service;
 
 use relm4::RelmApp;
 
@@ -12,5 +13,8 @@ fn main() {
     let settings =
         rli_core::settings::Settings::load(&rli_core::settings::Settings::default_path());
     i18n::init(settings.language.as_deref());
+    if std::env::args().any(|a| a == "--watch") {
+        std::process::exit(service::run());
+    }
     RelmApp::new(APP_ID).run::<app::App>(());
 }

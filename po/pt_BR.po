@@ -488,3 +488,33 @@ msgstr "Atualizações e espaço em disco"
 
 msgid "Watch folders"
 msgstr "Pastas monitoradas"
+
+msgid "Conversion failed"
+msgstr "A conversão falhou"
+
+msgid "Conversion finished"
+msgstr "Conversão concluída"
+
+msgid "Converting"
+msgstr "Convertendo"
+
+msgid "Open Vinci"
+msgstr "Abrir o Vinci"
+
+msgid "Pause conversions"
+msgstr "Pausar conversões"
+
+msgid "Paused"
+msgstr "Pausado"
+
+msgid "Quit background service"
+msgstr "Encerrar o serviço em segundo plano"
+
+msgid "Resume conversions"
+msgstr "Retomar conversões"
+
+msgid "Waiting for DaVinci Resolve to be installed"
+msgstr "Aguardando a instalação do DaVinci Resolve"
+
+msgid "Watching your folders"
+msgstr "Monitorando suas pastas"
