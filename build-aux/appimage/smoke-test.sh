@@ -6,13 +6,15 @@
 #
 #   build-aux/appimage/smoke-test.sh [DISPLAY]     # default :99 (an Xvfb is started)
 #
+# Tests the newest build in out/ (highest version), or the one in IMAGE=out/<file>.
+#
 # Needs podman (or ENGINE=docker), Xvfb and xdotool on the host. Optional: SHOT=file.png
 # saves a screenshot (needs ffmpeg on the host).
 set -eu
 cd "$(dirname "$0")"
 ENGINE="${ENGINE:-podman}"
 DISPLAY_NUM="${1:-:99}"
-IMAGE=out/Vinci-x86_64.AppImage
+IMAGE="${IMAGE:-$(ls out/Vinci-*-x86_64.AppImage 2>/dev/null | sort -V | tail -1)}"
 [ -x "$IMAGE" ] || { echo "build first: $IMAGE not found" >&2; exit 2; }
 
 started_x=""
@@ -29,13 +31,13 @@ cleanup() {
 trap cleanup EXIT
 
 "$ENGINE" run -d --name "$name" --network host -e DISPLAY="$DISPLAY_NUM" \
-    -e APPIMAGE_EXTRACT_AND_RUN=1 -v /tmp/.X11-unix:/tmp/.X11-unix \
+    -e APPIMAGE_EXTRACT_AND_RUN=1 -e VINCI_IMAGE="/app/$(basename "$IMAGE")" -v /tmp/.X11-unix:/tmp/.X11-unix \
     -v "$PWD/out:/app:ro" docker.io/library/ubuntu:24.04 sh -c '
     apt-get update -qq --error-on=any &&
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends \
         shared-mime-info libx11-6 libxcb1 libwayland-client0 libfontconfig1 libfreetype6 \
         libharfbuzz0b libfribidi0 fonts-dejavu-core >/dev/null &&
-    exec /app/Vinci-x86_64.AppImage' >/dev/null
+    exec "$VINCI_IMAGE"' >/dev/null
 
 i=0
 until DISPLAY="$DISPLAY_NUM" xdotool search --name '^Vinci$' >/dev/null 2>&1; do

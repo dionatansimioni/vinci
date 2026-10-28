@@ -1,12 +1,17 @@
 #!/bin/sh
-# Builds Vinci-x86_64.AppImage inside an Ubuntu 24.04 container, so the result runs on
+# Builds Vinci-<version>-x86_64.AppImage inside an Ubuntu 24.04 container, so the result runs on
 # any distro with glibc >= 2.39 (GTK and libadwaita are bundled by linuxdeploy's GTK plugin).
 #
 #   build-aux/appimage/build.sh            # needs podman (or ENGINE=docker)
 #
-# Output: build-aux/appimage/out/Vinci-x86_64.AppImage (+ .zsync for delta updates)
+# Output: build-aux/appimage/out/Vinci-<version>-x86_64.AppImage (+ .zsync for delta
+# updates). The version is the workspace one in Cargo.toml: bump it for every build you
+# hand out, so the newest file is always obvious. Older builds stay in out/.
 set -eu
 cd "$(dirname "$0")/../.."
+VERSION=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+[ -n "$VERSION" ] || { echo "no version in Cargo.toml" >&2; exit 1; }
+OUTPUT="Vinci-$VERSION-x86_64.AppImage"
 ENGINE="${ENGINE:-podman}"
 # Pinned tool versions: bump deliberately, never "continuous".
 LINUXDEPLOY=1-alpha-20250213-2
@@ -44,10 +49,10 @@ curl -fsSLo linuxdeploy-plugin-gtk.sh https://raw.githubusercontent.com/linuxdep
 chmod +x linuxdeploy linuxdeploy-plugin-gtk.sh
 export APPIMAGE_EXTRACT_AND_RUN=1 DEPLOY_GTK_VERSION=4
 export UPDATE_INFORMATION='gh-releases-zsync|dionatansimioni|vinci|latest|Vinci-*x86_64.AppImage.zsync'
-export LDAI_OUTPUT=Vinci-x86_64.AppImage
+export LDAI_OUTPUT=$OUTPUT VERSION=$VERSION
 ./linuxdeploy --appdir \$APPDIR --plugin gtk --output appimage \
     --desktop-file \$APPDIR/usr/share/applications/io.github.dionatansimioni.Vinci.desktop \
     --icon-file \$APPDIR/usr/share/icons/hicolor/scalable/apps/io.github.dionatansimioni.Vinci.svg
 mkdir -p /src/build-aux/appimage/out
-mv Vinci-x86_64.AppImage* /src/build-aux/appimage/out/
+mv $OUTPUT* /src/build-aux/appimage/out/
 "

@@ -48,6 +48,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.2.0" date="2026-10-28">
+      <description>
+        <p>Progress bar while installing podman and distrobox, About dialog, terminal in the container, button to show converted files, size warnings for conversion presets, window buttons on every desktop and the app icon in the taskbar.</p>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-10-27">
       <description>
         <p>First development version.</p>

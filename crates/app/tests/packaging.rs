@@ -107,3 +107,18 @@ fn ui_icons_exist_in_adwaita() {
         "icons missing from Adwaita: {missing:?}"
     );
 }
+
+/// Each build carries its version in the file name, and the AppStream release list
+/// announces the same version the binary reports.
+#[test]
+fn version_is_the_same_in_build_and_metainfo() {
+    let version = env!("CARGO_PKG_VERSION");
+    let meta = read(&format!("data/{APP_ID}.metainfo.xml"));
+    let newest = meta.split("<release version=\"").nth(1).unwrap();
+    assert!(
+        newest.starts_with(&format!("{version}\"")),
+        "add a <release> for {version} at the top of the metainfo"
+    );
+    let build = read("build-aux/appimage/build.sh");
+    assert!(build.contains("OUTPUT=\"Vinci-$VERSION-x86_64.AppImage\""));
+}
