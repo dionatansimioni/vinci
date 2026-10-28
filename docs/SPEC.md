@@ -68,6 +68,7 @@ Este documento registra as decisões de design tomadas antes da implementação.
 - Projetos/banco de dados: atualização **sempre preserva**; desinstalação mantém por padrão (checkbox desmarcado "apagar também", com confirmação).
 - Free → Studio (e vice-versa): nova instalação em container novo; ao final, oferecer remover o container anterior (marcado por padrão).
 - Studio: ativação por chave online e por dongle USB (regras udev via `pkexec`).
+  - As regras vêm do container e passam por lista de permissões: nada que execute programas, e toda mudança de permissão restrita ao vendor Blackmagic (`1edb`). A regra ampla do Resolve (`hidraw` 0777 para tudo) é trocada por uma restrita.
 
 ## 8. Integração com o desktop
 
@@ -79,9 +80,9 @@ Este documento registra as decisões de design tomadas antes da implementação.
 - ffmpeg do **repositório do Ubuntu dentro do container** (nada redistribuído por nós), com NVENC/VAAPI/QSV quando disponível e fallback CPU.
 - Aba **Preparar mídia** (importação): converte para intermediário escolhível — DNxHR HQ, ProRes 422, ou "só áudio" (AAC→PCM). Padrão conforme o sistema: Studio + NVIDIA → "só áudio"; demais → DNxHR HQ.
 - Motivo: AAC não funciona em nenhuma edição; H.264/H.265 só decodifica no Studio e só codifica no Studio com NVIDIA.
-- **Pasta monitorada de importação** e **pasta monitorada de exportação**.
+- **Pasta monitorada de importação** e **pasta monitorada de exportação** (padrão `~/Vídeos/Vinci/{Import,Export}`); resultados em subpastas (`Ready for Resolve`, `MP4`) para nunca voltarem como entrada.
 - Presets de exportação: "YouTube/Web" (H.264 alta qualidade + AAC 320k), "Arquivo H.265", "Personalizado".
-- Serviço em segundo plano (systemd `--user` / portal Background), ícone na bandeja via StatusNotifierItem (testado no GNOME e KDE); sem bandeja → notificações + dica da extensão AppIndicator; desligável nas configurações.
+- Serviço em segundo plano (`vinci --watch`, iniciado pela sessão via `~/.config/autostart`, que funciona no GNOME e KDE e com Flatpak/AppImage), ícone na bandeja via StatusNotifierItem (testado no GNOME e KDE); sem bandeja → notificações + dica da extensão AppIndicator; desligável nas configurações.
 
 ## 10. Testes
 
@@ -101,7 +102,7 @@ Princípio: separar o que muda (dados) do que não muda (código), detectar queb
 1. **Receitas declarativas** (TOML versionado): imagem/tag/espelhos, pacotes, libs a remover, variáveis de ambiente, repositórios ROCm/NEO, URLs da Blackmagic, versão fixada do distrobox. Adaptar o app = editar dados.
 2. **Receitas remotas** baixadas do GitHub entre releases: só declarativas (sem scripts), **assinadas com minisign** (chave pública embutida), com fallback para a receita embutida.
 3. **Migração de base**: quando a receita apontar uma base nova, fluxo igual ao Free→Studio (container novo, validar, oferecer remover o antigo).
-4. **Ponto de restauração**: `podman commit` antes de atualizar/migrar; botão "Voltar à versão anterior"; guarda só o último; desligável.
+4. **Ponto de restauração**: `podman commit` antes de atualizar/migrar; botão "Voltar a esta versão"; guarda só o último; desligável. Medido: ~10 GB e ~7 min para salvar, ~17 s para restaurar.
 5. **Cópia do instalador**: guarda o último zip que funcionou em `~/.local/share/vinci/installers`; desligável.
 6. **distrobox fixado**: usa o do host se for 1.8.x compatível; senão instala versão fixa em prefixo privado `~/.local/share/vinci/distrobox` (fora do PATH).
 7. **Imagem**: `docker.io/library/ubuntu:24.04`, registrando o digest usado; espelhos alternativos na receita.

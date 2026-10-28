@@ -68,6 +68,12 @@ Conversão de mídia testada dentro do container: todos os presets, progresso ao
 - **Autodiagnóstico**: apagado o atalho, o Vinci mostrou "O atalho no menu sumiu" com **Reparar**; o reparo recriou o atalho (com caminho absoluto do distrobox).
 - **Lição**: "crash" visto ao encerrar o Resolve com `SIGTERM` é o manipulador de sinal dele, não uma falha; testes usam `SIGKILL`.
 
+## Quarta rodada — restauração, serviço e regras USB
+
+- **Ponto de restauração real**: `podman container commit` do container com o Resolve gerou `localhost/vinci-backup:latest` com **10,1 GB em 425 s**; a restauração (remover + recriar a partir da imagem) levou **17 s** e o Resolve estava presente depois.
+- **Serviço `vinci --watch`**: um H.264/AAC colocado na pasta de importação virou DNxHR + PCM em `Ready for Resolve`; ciclos seguintes não reconverteram; o serviço encerrou ao ser desligado nas preferências e ao ficar sem pastas; a segunda instância saiu na hora. (Bandeja e notificações não verificadas: sem sessão gráfica real.)
+- **Regras udev reais do Resolve 21.1.2**: 3 aceitas (restritas ao vendor Blackmagic `1edb`); `75-davincipanel.rules` **rejeitada** por dar `MODE="0777"` a todos os `hidraw` do sistema e usar um grupo inexistente — substituída por regra própria restrita à Blackmagic. Nada foi instalado no `/etc` desta máquina.
+
 ## Ainda não testado
 
 - podman **rootless** com usuário comum (caminho real dos usuários).
