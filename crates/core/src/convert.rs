@@ -1,6 +1,8 @@
 //! Running conversions: ffmpeg inside the Resolve container, live progress, and the
 //! bookkeeping for watch folders.
 
+use crate::ffmpeg::{self, Encoder, ExportPreset, VideoCodec};
+use crate::gpu::Vendor;
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
@@ -115,7 +117,7 @@ pub enum Engine {
 }
 
 impl Engine {
-    fn wrap(&self, argv: &[String]) -> Vec<String> {
+    pub fn wrap(&self, argv: &[String]) -> Vec<String> {
         match self {
             Self::Container {
                 distrobox,
@@ -166,6 +168,62 @@ pub fn convert_file(
         return Err(ConvertError::NoOutput);
     }
     Ok(out)
+}
+
+/// Encoders that pass a test encode in this engine, best first, always ending with the
+/// CPU. A GPU without its video driver (e.g. AMD without mesa-va-drivers) is skipped here
+/// instead of failing every file.
+pub fn working_encoders(
+    engine: &Engine,
+    codec: VideoCodec,
+    vendor: Option<Vendor>,
+    render_node: Option<&Path>,
+) -> Vec<Encoder> {
+    let runner = crate::host::HostRunner::new();
+    let list = ["ffmpeg", "-hide_banner", "-encoders"].map(String::from);
+    let available = runner
+        .run_plain(&engine.wrap(&list))
+        .map(|o| ffmpeg::parse_encoders(&o))
+        .unwrap_or_default();
+    ffmpeg::encoder_candidates(codec, vendor, render_node, &available)
+        .into_iter()
+        .filter(|e| {
+            *e == Encoder::Cpu
+                || runner
+                    .run_plain(&engine.wrap(&ffmpeg::probe_command(e, codec)))
+                    .is_ok()
+        })
+        .collect()
+}
+
+/// Exports `input` with the first encoder that works: when a hardware encoder fails on
+/// this file, its partial output is deleted and the next one (finally the CPU) is tried.
+pub fn convert_export(
+    engine: &Engine,
+    input: &Path,
+    out_dir: &Path,
+    preset: ExportPreset,
+    encoders: &[Encoder],
+    mut on_progress: impl FnMut(Option<f64>),
+) -> Result<PathBuf, ConvertError> {
+    let mut last = ConvertError::NoOutput;
+    for encoder in encoders {
+        let command = ffmpeg::export_command(input, out_dir, preset, encoder);
+        let out = command.1.clone();
+        match convert_file(engine, command, input, &mut on_progress) {
+            Ok(p) => return Ok(p),
+            Err(e @ ConvertError::Failed { .. }) => {
+                // The name was free before this attempt, so whatever is there is ours.
+                let _ = std::fs::remove_file(&out);
+                crate::log::info(&format!(
+                    "{encoder:?} failed for this file, trying the next encoder"
+                ));
+                last = e;
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err(last)
 }
 
 /// Files in a watch folder that are ready to convert: media, not already handled, and
@@ -344,5 +402,110 @@ mod tests {
         );
         std::fs::remove_dir_all(&dir).unwrap();
         assert!(too_soon.is_empty(), "files still being written are skipped");
+    }
+
+    /// The first encoder fails on the file: its partial output goes, the next one runs.
+    /// Uses a fake ffmpeg (a shell script) so it runs anywhere.
+    #[test]
+    fn falls_back_to_the_next_encoder_and_cleans_up() {
+        let dir = std::env::temp_dir().join(format!("rli-fallback-{}", std::process::id()));
+        let bin = dir.join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        let input = dir.join("render.mov");
+        std::fs::write(&input, "x").unwrap();
+        // Writes the output (last argument), then fails when asked for NVENC.
+        let fake = bin.join("ffmpeg");
+        std::fs::write(
+            &fake,
+            "#!/bin/sh\nfor a; do out=$a; done\necho partial > \"$out\"\ncase \"$*\" in *nvenc*) echo 'nvenc broke' >&2; exit 1;; esac\necho progress=end\n",
+        )
+        .unwrap();
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let path = format!(
+            "{}:{}",
+            bin.display(),
+            std::env::var("PATH").unwrap_or_default()
+        );
+        // convert_file looks ffmpeg up on PATH; the fake only lives for this process's
+        // children, which inherit the variable set here.
+        std::env::set_var("PATH", &path);
+        let out = convert_export(
+            &Engine::Direct,
+            &input,
+            &dir,
+            ExportPreset::Web,
+            &[Encoder::Nvenc, Encoder::Cpu],
+            |_| {},
+        )
+        .unwrap();
+        let files: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".mp4"))
+            .collect();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(out.file_name().unwrap(), "render_web.mp4");
+        assert_eq!(
+            files,
+            ["render_web.mp4"],
+            "the failed attempt left nothing behind"
+        );
+    }
+
+    /// Against a real Resolve container: a VAAPI device without its driver (the error a
+    /// Ryzen user hit) is filtered out by the probe, and a forced VAAPI attempt falls back
+    /// to the CPU. Run with VINCI_DBX=<distrobox> VINCI_CONTAINER=<name> and `--ignored`.
+    #[test]
+    #[ignore]
+    fn real_broken_vaapi_falls_back_to_cpu() {
+        let (Ok(distrobox), Ok(container)) =
+            (std::env::var("VINCI_DBX"), std::env::var("VINCI_CONTAINER"))
+        else {
+            return;
+        };
+        let engine = Engine::Container {
+            distrobox,
+            container,
+        };
+        // Under $HOME: the only host folder the container is sure to see.
+        let dir = crate::state::home().join(".cache/vinci/vaapi-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let input = dir.join("render.mov");
+        let made = crate::host::HostRunner::new().run_plain(
+            &engine.wrap(
+                &[
+                    "ffmpeg",
+                    "-y",
+                    "-v",
+                    "error",
+                    "-f",
+                    "lavfi",
+                    "-i",
+                    "testsrc2=size=640x360:rate=30:duration=2",
+                    "-c:v",
+                    "mpeg4",
+                ]
+                .iter()
+                .map(|s| s.to_string())
+                .chain(std::iter::once(input.to_string_lossy().into_owned()))
+                .collect::<Vec<_>>(),
+            ),
+        );
+        assert!(made.is_ok(), "{made:?}");
+        let node = Path::new("/dev/dri/renderD128");
+        let usable = working_encoders(&engine, VideoCodec::H264, Some(Vendor::Amd), Some(node));
+        assert_eq!(usable, [Encoder::Cpu], "VAAPI without a driver is skipped");
+        let forced = [
+            Encoder::Vaapi {
+                device: node.into(),
+            },
+            Encoder::Cpu,
+        ];
+        let out = convert_export(&engine, &input, &dir, ExportPreset::Web, &forced, |_| {});
+        let ok = out.as_ref().is_ok_and(|p| p.exists());
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(ok, "{out:?}");
     }
 }

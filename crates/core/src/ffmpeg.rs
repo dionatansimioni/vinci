@@ -101,28 +101,54 @@ pub fn parse_encoders(output: &str) -> BTreeSet<String> {
         .collect()
 }
 
-/// Best available encoder for `codec` on this GPU, falling back to the CPU.
-pub fn pick_encoder(
+/// Encoders to try for `codec` on this GPU, best first. The CPU is always last, so there
+/// is something to fall back to when a hardware encoder turns out not to work.
+pub fn encoder_candidates(
     codec: VideoCodec,
     vendor: Option<Vendor>,
     render_node: Option<&Path>,
     available: &BTreeSet<String>,
-) -> Encoder {
+) -> Vec<Encoder> {
     let has = |kind: &str| available.contains(&format!("{}_{kind}", codec_prefix(codec)));
-    let vaapi = || {
-        render_node
-            .filter(|_| has("vaapi"))
-            .map(|d| Encoder::Vaapi {
-                device: d.to_path_buf(),
-            })
+    let vaapi = render_node
+        .filter(|_| has("vaapi"))
+        .map(|d| Encoder::Vaapi {
+            device: d.to_path_buf(),
+        });
+    let mut out: Vec<Encoder> = match vendor {
+        Some(Vendor::Nvidia) => has("nvenc").then_some(Encoder::Nvenc).into_iter().collect(),
+        Some(Vendor::Intel) => has("qsv")
+            .then_some(Encoder::Qsv)
+            .into_iter()
+            .chain(vaapi)
+            .collect(),
+        Some(Vendor::Amd) => vaapi.into_iter().collect(),
+        _ => Vec::new(),
     };
-    let hw = match vendor {
-        Some(Vendor::Nvidia) => has("nvenc").then_some(Encoder::Nvenc),
-        Some(Vendor::Intel) => has("qsv").then_some(Encoder::Qsv).or_else(vaapi),
-        Some(Vendor::Amd) => vaapi(),
-        _ => None,
+    out.push(Encoder::Cpu);
+    out
+}
+
+/// A short test encode of a generated clip: proves `encoder` really works here (the
+/// driver is installed and the device opens) before a real file is handed to it.
+pub fn probe_command(encoder: &Encoder, codec: VideoCodec) -> Vec<String> {
+    let settings = ExportSettings {
+        codec,
+        quality: 23,
+        audio_kbps: 128,
     };
-    hw.unwrap_or(Encoder::Cpu)
+    let (pre, video) = video_args(encoder, settings);
+    let mut a = args(&["ffmpeg", "-hide_banner", "-nostdin", "-v", "error"]);
+    a.extend(pre);
+    a.extend(args(&[
+        "-f",
+        "lavfi",
+        "-i",
+        "color=c=black:s=320x240:r=30:d=0.5",
+    ]));
+    a.extend(video);
+    a.extend(args(&["-f", "null", "-"]));
+    a
 }
 
 fn codec_prefix(codec: VideoCodec) -> &'static str {
@@ -235,14 +261,8 @@ pub fn import_command(
     (a, out)
 }
 
-/// Command and output file for turning a Resolve render into a distributable MP4.
-pub fn export_command(
-    input: &Path,
-    out_dir: &Path,
-    preset: ExportPreset,
-    encoder: &Encoder,
-) -> (Vec<String>, PathBuf) {
-    let s = preset.settings();
+/// Options before the input (device setup) and the video encoding options.
+fn video_args(encoder: &Encoder, s: ExportSettings) -> (Vec<String>, Vec<String>) {
     let q = s.quality.to_string();
     let prefix = codec_prefix(s.codec);
     let mut pre = Vec::new();
@@ -285,6 +305,18 @@ pub fn export_command(
         // Lets Apple devices and browsers recognize HEVC in MP4.
         video.extend(args(&["-tag:v", "hvc1"]));
     }
+    (pre, video)
+}
+
+/// Command and output file for turning a Resolve render into a distributable MP4.
+pub fn export_command(
+    input: &Path,
+    out_dir: &Path,
+    preset: ExportPreset,
+    encoder: &Encoder,
+) -> (Vec<String>, PathBuf) {
+    let s = preset.settings();
+    let (pre, video) = video_args(encoder, s);
     let out = output_path(input, out_dir, preset.suffix(), "mp4");
     let mut a = head(&pre, input);
     a.extend(args(&["-map", "0:v:0", "-map", "0:a?"]));
@@ -346,34 +378,45 @@ mod tests {
     }
 
     #[test]
-    fn picks_hardware_encoder_per_vendor() {
+    fn hardware_encoders_first_and_the_cpu_always_last() {
         let e = parse_encoders(ENCODERS);
         let node = Path::new("/dev/dri/renderD128");
+        let vaapi = Encoder::Vaapi {
+            device: node.into(),
+        };
         use VideoCodec::*;
+        let c = |codec, vendor, node| encoder_candidates(codec, vendor, node, &e);
         assert_eq!(
-            pick_encoder(H264, Some(Vendor::Nvidia), None, &e),
-            Encoder::Nvenc
+            c(H264, Some(Vendor::Nvidia), None),
+            [Encoder::Nvenc, Encoder::Cpu]
         );
         assert_eq!(
-            pick_encoder(H264, Some(Vendor::Amd), Some(node), &e),
-            Encoder::Vaapi {
-                device: node.into()
-            }
+            c(H264, Some(Vendor::Amd), Some(node)),
+            [vaapi, Encoder::Cpu]
+        );
+        assert_eq!(c(H264, Some(Vendor::Amd), None), [Encoder::Cpu]);
+        assert_eq!(
+            c(H265, Some(Vendor::Intel), Some(node)),
+            [Encoder::Qsv, Encoder::Cpu]
         );
         assert_eq!(
-            pick_encoder(H264, Some(Vendor::Amd), None, &e),
-            Encoder::Cpu
-        );
-        assert_eq!(
-            pick_encoder(H265, Some(Vendor::Intel), Some(node), &e),
-            Encoder::Qsv
-        );
-        assert_eq!(
-            pick_encoder(H265, Some(Vendor::Nvidia), None, &e),
-            Encoder::Cpu,
+            c(H265, Some(Vendor::Nvidia), None),
+            [Encoder::Cpu],
             "no hevc_nvenc"
         );
-        assert_eq!(pick_encoder(H264, None, Some(node), &e), Encoder::Cpu);
+        assert_eq!(c(H264, None, Some(node)), [Encoder::Cpu]);
+    }
+
+    #[test]
+    fn probe_encodes_a_generated_clip_with_the_same_options() {
+        let vaapi = Encoder::Vaapi {
+            device: "/dev/dri/renderD128".into(),
+        };
+        let a = probe_command(&vaapi, VideoCodec::H264);
+        assert!(has(&a, ["-vaapi_device", "/dev/dri/renderD128"]));
+        assert!(has(&a, ["-c:v", "h264_vaapi"]));
+        assert!(has(&a, ["-f", "lavfi"]));
+        assert_eq!(a[a.len() - 3..], ["-f", "null", "-"], "writes nothing");
     }
 
     #[test]
