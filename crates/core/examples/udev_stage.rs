@@ -12,7 +12,9 @@ fn main() {
     let home = state::home();
     let inst = State::load(&State::default_path())
         .unwrap()
-        .installation
+        .installations
+        .into_iter()
+        .next()
         .expect("nothing installed");
     let dbx = tools::detect(&runner, &recipe, &home)
         .distrobox

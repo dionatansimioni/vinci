@@ -93,7 +93,7 @@ pub fn restore(
         cancel: None,
     };
     installer::execute(runner, &steps, &ctx, on)?;
-    state.installation = Some(previous.clone());
+    state.set_installation(previous.clone());
     // The image now backs the active container; it stops being a separate restore point.
     state.backup = None;
     state.save(state_path).map_err(Error::State)?;
@@ -119,11 +119,11 @@ mod tests {
             "rli-backup-{}-{name}/state.json",
             std::process::id()
         ));
-        let st = State {
-            installation: Some(inst("21.2")),
+        let mut st = State {
             backup: Some(inst("21.1.2")),
             ..State::default()
         };
+        st.set_installation(inst("21.2"));
         st.save(&p).unwrap();
         p
     }
@@ -144,7 +144,7 @@ mod tests {
         let st = State::load(&path).unwrap();
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert_eq!(back.version.to_string(), "21.1.2");
-        assert_eq!(st.installation.unwrap().version.to_string(), "21.1.2");
+        assert_eq!(st.installations, [inst("21.1.2")]);
         assert!(st.backup.is_none());
         let calls = r.calls();
         let create = calls
@@ -172,7 +172,7 @@ mod tests {
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert!(matches!(e, Err(Error::NoRestorePoint)));
         assert_eq!(
-            st.installation.unwrap().version.to_string(),
+            st.installations[0].version.to_string(),
             "21.2",
             "active install untouched"
         );

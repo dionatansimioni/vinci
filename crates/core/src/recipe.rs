@@ -363,7 +363,9 @@ mod tests {
             repo.url,
             "https://ppa.launchpadcontent.net/kobuk-team/intel-graphics/ubuntu"
         );
-        assert!(repo.key_url.ends_with("0x0C0E6AF955CE463C03FC51574D098D70AFBE5E1F"));
+        assert!(repo
+            .key_url
+            .ends_with("0x0C0E6AF955CE463C03FC51574D098D70AFBE5E1F"));
     }
 
     #[test]

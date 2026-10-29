@@ -83,7 +83,7 @@ fn main() {
         },
     );
     match out {
-        Ok(o) => println!("installed {:?}, replaced {:?}", o.installation, o.replaced),
+        Ok(o) => println!("installed {:?}", o.installation),
         Err(e) => {
             eprintln!("FAILED: {e}");
             if let flow::Error::Step(rli_core::installer::Error::StepFailed { output, .. }) = &e {

@@ -15,7 +15,11 @@ fn main() {
     let recipe = Recipe::bundled();
     let path = State::default_path();
     let mut st = State::load(&path).unwrap();
-    let inst = st.installation.clone().expect("nothing installed");
+    let inst = st
+        .installations
+        .first()
+        .cloned()
+        .expect("nothing installed");
     match cmd.as_str() {
         "snapshot" => {
             let step = backup::snapshot_step(&inst.container);

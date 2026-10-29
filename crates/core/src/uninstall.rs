@@ -5,6 +5,7 @@
 
 use crate::distro::Distro;
 use crate::host::{argv, Runner};
+use crate::installer_file::Edition;
 use crate::integrate;
 use crate::recipe::Recipe;
 use crate::state::{InstalledTool, State, ToolSource};
@@ -91,6 +92,49 @@ pub fn remove_tools(
     (removed, failed)
 }
 
+/// Removes one install while another stays: its container, its menu entry, and the
+/// restore point when it holds this install. Tools, projects, USB rules and Vinci's own
+/// folders are shared, so they stay; the last install goes through [`uninstall`].
+pub fn remove_installation(
+    runner: &dyn Runner,
+    data_home: &Path,
+    state_path: &Path,
+    container: &str,
+) -> Summary {
+    let mut sum = Summary::default();
+    let mut state = State::load(state_path).unwrap_or_default();
+    match runner.run(&argv(&["podman", "rm", "--force", "--ignore", container])) {
+        Ok(o) if o.success => sum.removed_containers.push(container.to_string()),
+        _ => sum.warnings.push(format!("container {container}")),
+    }
+    let removed = state.remove_installation(container);
+    if let Some(inst) = &removed {
+        let last = state.installations.is_empty();
+        if let Err(e) = integrate::remove(runner, data_home, inst.edition, container, last) {
+            sum.warnings.push(format!("menu entry: {e}"));
+        }
+    }
+    if state
+        .backup
+        .as_ref()
+        .is_some_and(|b| b.container == container)
+    {
+        // Fails harmlessly while another container still runs from the image.
+        let _ = runner.run(&argv(&[
+            "podman",
+            "image",
+            "rm",
+            "--ignore",
+            crate::backup::IMAGE,
+        ]));
+        state.backup = None;
+    }
+    if let Err(e) = state.save(state_path) {
+        sum.warnings.push(format!("state: {e}"));
+    }
+    sum
+}
+
 /// Runs the uninstall. Best effort: keeps going after a failed step and reports it.
 /// `run_root` runs a command as root (pkexec), used only to remove podman.
 pub fn uninstall(
@@ -127,8 +171,11 @@ pub fn uninstall(
         crate::backup::IMAGE,
     ]));
 
-    if let Err(e) = integrate::remove(runner, data_home) {
-        sum.warnings.push(format!("menu entry: {e}"));
+    for edition in [Edition::Free, Edition::Studio] {
+        let container = crate::container::container_name(recipe, edition);
+        if let Err(e) = integrate::remove(runner, data_home, edition, &container, true) {
+            sum.warnings.push(format!("menu entry: {e}"));
+        }
     }
     if opts.delete_projects {
         let dir = resolve_data_dir(home);
@@ -155,7 +202,7 @@ pub fn uninstall(
     for dir in vinci_dirs(home) {
         let _ = std::fs::remove_dir_all(dir);
     }
-    state.installation = None;
+    state.installations.clear();
     if !state.udev_rules.is_empty() {
         if run_root(&crate::udev::remove_command(&state.udev_rules)) {
             state.udev_rules.clear();
@@ -200,7 +247,7 @@ mod tests {
             },
         );
         st.udev_rules = vec!["/etc/udev/rules.d/99-BlackmagicDevices.rules".into()];
-        st.installation = Some(Installation {
+        st.set_installation(Installation {
             container: "vinci-free".into(),
             edition: Edition::Free,
             version: "21.1.2".parse().unwrap(),
@@ -249,8 +296,57 @@ mod tests {
             "projects kept by default"
         );
         let st = State::load(&state_path).unwrap();
-        assert!(st.installation.is_none());
+        assert!(st.installations.is_empty());
         assert_eq!(st.tools.len(), 2, "tool records kept for a later uninstall");
+    }
+
+    #[test]
+    fn removing_one_of_two_installs_leaves_the_other_and_shared_things() {
+        let (home, state_path) = setup("one");
+        let mut st = State::load(&state_path).unwrap();
+        let studio = Installation {
+            container: "vinci-studio".into(),
+            edition: Edition::Studio,
+            version: "21.1.2".parse().unwrap(),
+        };
+        st.set_installation(studio.clone());
+        st.backup = Some(studio);
+        st.save(&state_path).unwrap();
+        let data = home.0.join(".local/share");
+        let entry = |c: &str| format!("X-Vinci-Container={c}\n");
+        for (e, c) in [
+            (Edition::Free, "vinci-free"),
+            (Edition::Studio, "vinci-studio"),
+        ] {
+            integrate::install(&runner(""), &Recipe::bundled(), "d", c, e, &data, &entry(c))
+                .unwrap();
+        }
+        let r = runner("");
+
+        let sum = remove_installation(&r, &data, &state_path, "vinci-studio");
+        assert_eq!(sum.removed_containers, ["vinci-studio"]);
+        assert!(sum.warnings.is_empty(), "{:?}", sum.warnings);
+        let calls = r.calls();
+        assert!(!calls.iter().any(|c| c.contains(&"vinci-free".to_string())));
+        assert!(calls.contains(&argv(&[
+            "podman",
+            "image",
+            "rm",
+            "--ignore",
+            crate::backup::IMAGE
+        ])));
+        let st = State::load(&state_path).unwrap();
+        assert_eq!(st.installations.len(), 1);
+        assert_eq!(st.installations[0].container, "vinci-free");
+        assert!(st.backup.is_none(), "its restore point went with it");
+        assert_eq!(st.tools.len(), 2, "tools stay for the other install");
+        let free = crate::launcher::paths(&data, Edition::Free);
+        assert!(free.desktop.exists() && free.mime.exists());
+        assert!(!crate::launcher::paths(&data, Edition::Studio)
+            .desktop
+            .exists());
+        assert!(resolve_data_dir(&home.0).exists());
+        assert!(home.0.join(".local/share/vinci").exists());
     }
 
     #[test]

@@ -33,9 +33,12 @@ pub struct Installation {
 pub struct State {
     #[serde(default)]
     pub tools: Vec<InstalledTool>,
-    /// The active Resolve install. Only one exists at a time.
+    /// Every Resolve install, one container each (Free and Studio can live side by side).
     #[serde(default)]
-    pub installation: Option<Installation>,
+    pub installations: Vec<Installation>,
+    /// Vinci 0.3 and older kept a single install here; [`State::load`] moves it over.
+    #[serde(default, rename = "installation", skip_serializing)]
+    pub(crate) legacy_installation: Option<Installation>,
     /// What the restore point (`backup::IMAGE`) contains, if one exists.
     #[serde(default)]
     pub backup: Option<Installation>,
@@ -54,7 +57,13 @@ impl State {
     /// Loads the state; a missing file means a fresh system.
     pub fn load(path: &Path) -> std::io::Result<Self> {
         match std::fs::read_to_string(path) {
-            Ok(text) => serde_json::from_str(&text).map_err(std::io::Error::other),
+            Ok(text) => {
+                let mut state: Self = serde_json::from_str(&text).map_err(std::io::Error::other)?;
+                if let Some(old) = state.legacy_installation.take() {
+                    state.set_installation(old);
+                }
+                Ok(state)
+            }
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
             Err(e) => Err(e),
         }
@@ -68,6 +77,35 @@ impl State {
         let tmp = path.with_extension("json.tmp");
         std::fs::write(&tmp, serde_json::to_vec_pretty(self)?)?;
         std::fs::rename(tmp, path)
+    }
+
+    pub fn installation(&self, container: &str) -> Option<&Installation> {
+        self.installations.iter().find(|i| i.container == container)
+    }
+
+    /// Adds `inst`, or replaces the install living in the same container.
+    pub fn set_installation(&mut self, inst: Installation) {
+        match self
+            .installations
+            .iter_mut()
+            .find(|i| i.container == inst.container)
+        {
+            Some(slot) => *slot = inst,
+            None => {
+                self.installations.push(inst);
+                // Free before Studio, whatever order they were installed in.
+                self.installations
+                    .sort_by_key(|i| i.edition == Edition::Studio);
+            }
+        }
+    }
+
+    pub fn remove_installation(&mut self, container: &str) -> Option<Installation> {
+        let i = self
+            .installations
+            .iter()
+            .position(|i| i.container == container)?;
+        Some(self.installations.remove(i))
     }
 
     pub fn record_tool(&mut self, name: &str, source: ToolSource) {
@@ -203,7 +241,7 @@ mod tests {
         let mut s = State::default();
         s.record_tool("podman", ToolSource::PackageManager);
         s.record_tool("podman", ToolSource::PackageManager);
-        s.installation = Some(Installation {
+        s.set_installation(Installation {
             container: "resolve-studio".into(),
             edition: Edition::Studio,
             version: "20.2.1".parse().unwrap(),
@@ -213,6 +251,64 @@ mod tests {
         std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
         assert_eq!(loaded, s);
         assert_eq!(loaded.tools.len(), 1, "duplicates are not recorded");
+    }
+
+    fn inst(container: &str, edition: Edition, version: &str) -> Installation {
+        Installation {
+            container: container.into(),
+            edition,
+            version: version.parse().unwrap(),
+        }
+    }
+
+    #[test]
+    fn keeps_free_and_studio_side_by_side() {
+        let mut s = State::default();
+        s.set_installation(inst("vinci-studio", Edition::Studio, "21.1.2"));
+        s.set_installation(inst("vinci-free", Edition::Free, "21.1.2"));
+        s.set_installation(inst("vinci-studio", Edition::Studio, "21.2"));
+        let names: Vec<&str> = s
+            .installations
+            .iter()
+            .map(|i| i.container.as_str())
+            .collect();
+        assert_eq!(
+            names,
+            ["vinci-free", "vinci-studio"],
+            "Free first, no duplicate"
+        );
+        assert_eq!(
+            s.installation("vinci-studio").unwrap().version.to_string(),
+            "21.2"
+        );
+        assert_eq!(
+            s.remove_installation("vinci-free").unwrap().edition,
+            Edition::Free
+        );
+        assert!(s.remove_installation("vinci-free").is_none());
+        assert_eq!(s.installations.len(), 1);
+    }
+
+    /// state.json written by Vinci 0.3 and older had a single `installation`.
+    #[test]
+    fn reads_the_single_install_of_older_versions() {
+        let path = tmp("legacy");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            r#"{"tools":[],"installation":{"container":"vinci-studio","edition":"Studio","version":"21.1.2"},"backup":null}"#,
+        )
+        .unwrap();
+        let s = State::load(&path).unwrap();
+        assert_eq!(
+            s.installations,
+            [inst("vinci-studio", Edition::Studio, "21.1.2")]
+        );
+        s.save(&path).unwrap();
+        let text = std::fs::read_to_string(&path).unwrap();
+        std::fs::remove_dir_all(path.parent().unwrap()).unwrap();
+        assert!(!text.contains("\"installation\""), "{text}");
+        assert!(text.contains("\"installations\""));
     }
 
     #[test]

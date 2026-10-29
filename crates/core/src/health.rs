@@ -94,7 +94,7 @@ pub fn check(
         a
     };
     let mut problems = Vec::new();
-    if !launcher::paths(data_home).desktop.exists() {
+    if !launcher::paths(data_home, inst.edition).desktop.exists() {
         problems.push(Problem::LauncherMissing);
     }
     if !ok(argv(&["podman", "container", "exists", &inst.container])) {
@@ -133,7 +133,7 @@ mod tests {
 
     fn data_home_with_launcher(name: &str, present: bool) -> std::path::PathBuf {
         let d = std::env::temp_dir().join(format!("rli-health-{}-{name}", std::process::id()));
-        let p = launcher::paths(&d).desktop;
+        let p = launcher::paths(&d, Edition::Free).desktop;
         std::fs::create_dir_all(p.parent().unwrap()).unwrap();
         if present {
             std::fs::write(&p, "x").unwrap();

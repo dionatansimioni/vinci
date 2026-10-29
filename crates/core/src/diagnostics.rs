@@ -77,17 +77,15 @@ pub fn report(i: &Input) -> String {
             t.distrobox
         );
     }
-    match &i.state.installation {
-        Some(inst) => {
-            let _ = writeln!(
-                s,
-                "- Installed: {:?} {} in container {}",
-                inst.edition, inst.version, inst.container
-            );
-        }
-        None => {
-            let _ = writeln!(s, "- Installed: nothing");
-        }
+    if i.state.installations.is_empty() {
+        let _ = writeln!(s, "- Installed: nothing");
+    }
+    for inst in &i.state.installations {
+        let _ = writeln!(
+            s,
+            "- Installed: {:?} {} in container {}",
+            inst.edition, inst.version, inst.container
+        );
     }
     if !i.report.findings.is_empty() {
         let _ = writeln!(

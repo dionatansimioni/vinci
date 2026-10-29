@@ -5,13 +5,24 @@
 //! (PRIME offload, HSA override, Qt platform) is baked into `Exec`.
 
 use crate::gpu::{self, Gpu, Support, Vendor};
+use crate::installer_file::Edition;
 use crate::recipe::Recipe;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
+/// The Free edition's menu entry. Up to Vinci 0.3 the only install, whatever its edition,
+/// used this id.
 pub const DESKTOP_ID: &str = "io.github.dionatansimioni.Vinci.Resolve";
-pub const ICON_NAME: &str = "io.github.dionatansimioni.Vinci.Resolve";
 pub const MIME_XML_NAME: &str = "io.github.dionatansimioni.Vinci.Resolve.xml";
+
+/// Menu entry id (and icon name) of each edition, so Free and Studio can both be in the
+/// menu.
+pub fn desktop_id(edition: Edition) -> String {
+    match edition {
+        Edition::Free => DESKTOP_ID.to_string(),
+        Edition::Studio => format!("{DESKTOP_ID}.Studio"),
+    }
+}
 
 /// Environment for Resolve: recipe defaults, vendor extras, then what this machine needs.
 pub fn environment(recipe: &Recipe, gpus: &[Gpu], chosen: &Gpu) -> BTreeMap<String, String> {
@@ -78,6 +89,7 @@ fn quote_exec_arg(arg: &str) -> String {
 pub struct Entry<'a> {
     pub distrobox: &'a str,
     pub container: &'a str,
+    pub edition: Edition,
     /// e.g. "DaVinci Resolve" or "DaVinci Resolve Studio"
     pub name: &'a str,
     pub env: &'a BTreeMap<String, String>,
@@ -120,13 +132,14 @@ pub fn desktop_file(recipe: &Recipe, e: &Entry) -> String {
          GenericName=Video Editor\n\
          Comment=Installed by Vinci (unofficial)\n\
          Exec={exec} %f\n\
-         Icon={ICON_NAME}\n\
+         Icon={icon}\n\
          Terminal=false\n\
          Categories=AudioVideo;Video;AudioVideoEditing;\n\
          MimeType={mime}\n\
          StartupWMClass=resolve\n\
          X-Vinci-Container={container}\n",
         name = e.name,
+        icon = desktop_id(e.edition),
         exec = exec.join(" "),
         container = e.container,
     )
@@ -156,12 +169,21 @@ pub struct Paths {
     pub icon: PathBuf,
 }
 
-pub fn paths(data_home: &Path) -> Paths {
+pub fn paths(data_home: &Path, edition: Edition) -> Paths {
+    let id = desktop_id(edition);
     Paths {
-        desktop: data_home.join(format!("applications/{DESKTOP_ID}.desktop")),
+        desktop: data_home.join(format!("applications/{id}.desktop")),
         mime: data_home.join(format!("mime/packages/{MIME_XML_NAME}")),
-        icon: data_home.join(format!("icons/hicolor/128x128/apps/{ICON_NAME}.png")),
+        icon: data_home.join(format!("icons/hicolor/128x128/apps/{id}.png")),
     }
+}
+
+/// Whether the menu entry at `path` starts `container` (Vinci writes that down in it).
+pub fn entry_runs(path: &Path, container: &str) -> bool {
+    std::fs::read_to_string(path).is_ok_and(|t| {
+        t.lines()
+            .any(|l| l.strip_prefix("X-Vinci-Container=") == Some(container))
+    })
 }
 
 #[cfg(test)]
@@ -229,6 +251,7 @@ mod tests {
             &Entry {
                 distrobox: "/home/u/.local/share/vinci/distrobox/bin/distrobox",
                 container: "vinci-free",
+                edition: Edition::Free,
                 name: "DaVinci Resolve",
                 env: &env,
             },
@@ -241,6 +264,7 @@ mod tests {
             text.contains("MimeType=application/x-resolveproj;application/x-resolvetimeline;\n")
         );
         assert!(text.contains("Name=DaVinci Resolve\n"));
+        assert!(text.contains("Icon=io.github.dionatansimioni.Vinci.Resolve\n"));
     }
 
     #[test]
@@ -264,6 +288,7 @@ mod tests {
             &Entry {
                 distrobox: "/home/my user/bin/distrobox",
                 container: "vinci-free",
+                edition: Edition::Free,
                 name: "DaVinci Resolve",
                 env: &env,
             },
@@ -285,7 +310,7 @@ mod tests {
     fn mime_xml_declares_globs() {
         let x = mime_xml();
         assert!(x.contains("*.drp") && x.contains("*.drt"));
-        let p = paths(Path::new("/home/u/.local/share"));
+        let p = paths(Path::new("/home/u/.local/share"), Edition::Free);
         assert!(p
             .mime
             .ends_with("mime/packages/io.github.dionatansimioni.Vinci.Resolve.xml"));
@@ -296,5 +321,30 @@ mod tests {
         assert!(p
             .icon
             .ends_with("icons/hicolor/128x128/apps/io.github.dionatansimioni.Vinci.Resolve.png"));
+        let studio = paths(Path::new("/d"), Edition::Studio);
+        assert_eq!(
+            studio.desktop,
+            Path::new("/d/applications/io.github.dionatansimioni.Vinci.Resolve.Studio.desktop")
+        );
+        assert_eq!(
+            studio.mime,
+            p.mime
+                .strip_prefix("/home/u/.local/share")
+                .map(|m| Path::new("/d").join(m))
+                .unwrap(),
+            "one file-type package for both"
+        );
+    }
+
+    #[test]
+    fn tells_which_container_an_entry_starts() {
+        let dir = std::env::temp_dir().join(format!("rli-entry-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let f = dir.join("e.desktop");
+        std::fs::write(&f, "[Desktop Entry]\nX-Vinci-Container=vinci-studio\n").unwrap();
+        assert!(entry_runs(&f, "vinci-studio"));
+        assert!(!entry_runs(&f, "vinci-free"));
+        assert!(!entry_runs(&dir.join("missing.desktop"), "vinci-studio"));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

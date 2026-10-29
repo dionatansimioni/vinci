@@ -50,9 +50,6 @@ pub struct Request<'a> {
 #[derive(Debug)]
 pub struct Outcome {
     pub installation: Installation,
-    /// The install that was active before, if it lived in another container
-    /// (Free ↔ Studio). The GUI offers to remove it.
-    pub replaced: Option<Installation>,
 }
 
 pub fn work_dir(home: &Path) -> PathBuf {
@@ -105,6 +102,7 @@ pub fn write_launcher(
         &launcher::Entry {
             distrobox,
             container: &installation.container,
+            edition: installation.edition,
             name: display_name(installation.edition),
             env: &env,
         },
@@ -114,6 +112,7 @@ pub fn write_launcher(
         recipe,
         distrobox,
         &installation.container,
+        installation.edition,
         data_home,
         &entry,
     )
@@ -182,8 +181,8 @@ pub fn install_resolve(
     let work = work_dir(req.home);
     let previous = State::load(req.state_path)
         .map_err(Error::State)?
-        .installation
-        .filter(|i| i.container == name);
+        .installation(&name)
+        .cloned();
     let snapshot = req.keep_restore_point && previous.is_some();
     let steps = container::install_plan(
         recipe,
@@ -255,15 +254,10 @@ pub fn install_resolve(
     if snapshot {
         state.backup = previous;
     }
-    let replaced = state
-        .installation
-        .replace(installation.clone())
-        .filter(|old| old.container != installation.container);
+    // Another edition, in its own container, stays installed next to this one.
+    state.set_installation(installation.clone());
     state.save(req.state_path).map_err(Error::State)?;
-    Ok(Outcome {
-        installation,
-        replaced,
-    })
+    Ok(Outcome { installation })
 }
 
 #[cfg(test)]
@@ -351,15 +345,14 @@ mod tests {
         let env = Env::new("full", Edition::Free);
         let out = env.run(&ok_runner()).unwrap();
         assert_eq!(out.installation.container, "vinci-free");
-        assert!(out.replaced.is_none());
 
-        let desktop = launcher::paths(&env.home.join(".local/share")).desktop;
+        let desktop = launcher::paths(&env.home.join(".local/share"), Edition::Free).desktop;
         let text = std::fs::read_to_string(desktop).unwrap();
         assert!(text.contains("Name=DaVinci Resolve\n"));
         assert!(text.contains("--name vinci-free"));
 
         let state = State::load(&env.home.join("state.json")).unwrap();
-        assert_eq!(state.installation.unwrap().version.to_string(), "21.1.2");
+        assert_eq!(state.installations[0].version.to_string(), "21.1.2");
         assert!(installers_dir(&env.home)
             .join("DaVinci_Resolve_21.1.2_Linux.zip")
             .exists());
@@ -379,14 +372,40 @@ mod tests {
     }
 
     #[test]
-    fn studio_after_free_reports_the_replaced_install() {
+    fn studio_after_free_keeps_both() {
         let free = Env::new("switch", Edition::Free);
         free.run(&ok_runner()).unwrap();
         let mut studio = Env::new("switch", Edition::Studio);
         studio.home = free.home.clone();
-        let out = studio.run(&ok_runner()).unwrap();
+        let runner = ok_runner();
+        let out = studio.run(&runner).unwrap();
         assert_eq!(out.installation.container, "vinci-studio");
-        assert_eq!(out.replaced.unwrap().container, "vinci-free");
+        let st = State::load(&free.home.join("state.json")).unwrap();
+        let names: Vec<&str> = st
+            .installations
+            .iter()
+            .map(|i| i.container.as_str())
+            .collect();
+        assert_eq!(names, ["vinci-free", "vinci-studio"]);
+        assert!(
+            !runner
+                .calls()
+                .iter()
+                .any(|c| c.contains(&"vinci-free".to_string())),
+            "the Free container is not touched"
+        );
+        let data = free.home.join(".local/share");
+        for e in [Edition::Free, Edition::Studio] {
+            assert!(
+                launcher::paths(&data, e).desktop.exists(),
+                "{e:?} in the menu"
+            );
+        }
+        assert!(
+            std::fs::read_to_string(launcher::paths(&data, Edition::Studio).desktop)
+                .unwrap()
+                .contains("Name=DaVinci Resolve Studio\n")
+        );
         let kept: Vec<_> = std::fs::read_dir(installers_dir(&free.home))
             .unwrap()
             .collect();
@@ -399,7 +418,7 @@ mod tests {
         let env = Env::new("repair", Edition::Free);
         let out = env.run(&ok_runner()).unwrap();
         let data = env.home.join(".local/share");
-        let desktop = launcher::paths(&data).desktop;
+        let desktop = launcher::paths(&data, Edition::Free).desktop;
         std::fs::remove_file(&desktop).unwrap();
         let gpus = [nvidia()];
         write_launcher(
@@ -444,10 +463,12 @@ mod tests {
     }
 
     #[test]
-    fn reinstalling_same_edition_is_not_a_replacement() {
+    fn reinstalling_same_edition_keeps_one_entry() {
         let env = Env::new("again", Edition::Free);
         env.run(&ok_runner()).unwrap();
-        assert!(env.run(&ok_runner()).unwrap().replaced.is_none());
+        env.run(&ok_runner()).unwrap();
+        let st = State::load(&env.home.join("state.json")).unwrap();
+        assert_eq!(st.installations.len(), 1);
     }
 
     /// Cancels (like the user's button) when a command starting with `at` begins.
@@ -529,9 +550,11 @@ mod tests {
         assert!(calls.contains(&argv(&["podman", "image", "rm", "--ignore", &image])));
         assert!(!env.home.join("state.json").exists(), "nothing recorded");
         assert!(!work_dir(&env.home).exists());
-        assert!(!launcher::paths(&env.home.join(".local/share"))
-            .desktop
-            .exists());
+        assert!(
+            !launcher::paths(&env.home.join(".local/share"), Edition::Free)
+                .desktop
+                .exists()
+        );
     }
 
     #[test]
@@ -574,7 +597,7 @@ mod tests {
             "the image was already there"
         );
         let st = State::load(&env.home.join("state.json")).unwrap();
-        assert_eq!(st.installation.unwrap().container, "vinci-free");
+        assert_eq!(st.installations[0].container, "vinci-free");
         assert!(
             st.backup.is_none(),
             "the restore point is the active install again"
@@ -595,10 +618,13 @@ mod tests {
         let calls = r.inner.calls();
         assert!(position(&calls, &["podman", "rm"]).is_none());
         assert!(position(&calls, &["distrobox"]).is_none());
-        assert!(State::load(&env.home.join("state.json"))
-            .unwrap()
-            .installation
-            .is_some());
+        assert_eq!(
+            State::load(&env.home.join("state.json"))
+                .unwrap()
+                .installations
+                .len(),
+            1
+        );
     }
 
     /// No container at the start (e.g. removed by a system cleanup): the restore point
