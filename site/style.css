@@ -151,3 +151,12 @@ details p { color: var(--text-2); margin: 10px 0 0; }
 footer { background: var(--ink); color: #b9b5c2; padding: 40px 0; font-size: 14px; }
 footer a { color: var(--orange-light); }
 footer .wrap { display: grid; gap: 10px; }
+footer .about {
+  grid-template-columns: 1fr auto; gap: 32px; align-items: center;
+  padding-bottom: 32px; margin-bottom: 28px; border-bottom: 1px solid #3d3846;
+}
+@media (max-width: 760px) { footer .about { grid-template-columns: 1fr; } }
+footer .about h2 { color: #fff; font-size: 24px; margin: 0 0 8px; }
+footer .about p { margin: 0 0 8px; font-size: 16px; color: #d9d6df; }
+footer .about p.credits { font-size: 14px; color: #b9b5c2; }
+footer .about .btn { justify-self: start; }
