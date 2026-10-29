@@ -1,0 +1,36 @@
+name: Release
+
+# Pushing a tag like v0.5.0 builds the AppImage and publishes a GitHub release with it,
+# its .zsync (delta updates), the list of bundled Ubuntu packages and their source code.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  appimage:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag matches the version in Cargo.toml
+        run: |
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -1)
+          [ "v$version" = "$GITHUB_REF_NAME" ] || { echo "tag $GITHUB_REF_NAME, Cargo.toml $version"; exit 1; }
+      - name: Build AppImage (with the sources of the bundled libraries)
+        run: SOURCES=1 build-aux/appimage/build.sh
+      - name: Smoke test on a clean Ubuntu without GTK
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb xdotool
+          build-aux/appimage/smoke-test.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          # Release notes: this version's <release> entry in the metainfo.
+          notes=$(sed -n "/<release version=\"$version\"/,/<\/release>/p" data/io.github.dionatansimioni.Vinci.metainfo.xml \
+            | sed -n 's/.*<p>\(.*\)<\/p>.*/\1/p')
+          gh release create "$GITHUB_REF_NAME" --title "Vinci $version" --notes "$notes" \
+            build-aux/appimage/out/Vinci-$version-x86_64.AppImage*
