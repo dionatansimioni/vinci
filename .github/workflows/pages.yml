@@ -1,10 +1,11 @@
 name: Website
 
-# Publishes site/ to GitHub Pages (https://dionatansimioni.github.io/vinci/).
+# Publishes site/ to GitHub Pages (https://dionatansimioni.github.io/vinci/) on every push
+# to main, so the site always matches the latest code. The download buttons point at
+# releases/latest, which GitHub keeps current on its own.
 on:
   push:
     branches: [main]
-    paths: [site/**, .github/workflows/pages.yml]
   workflow_dispatch:
 
 permissions:

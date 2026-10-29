@@ -51,6 +51,8 @@ Arch, openSUSE, Mint, Pop!_OS, Bazzite e outras, sem mexer nas bibliotecas do se
 - **Pastas monitoradas.** Arquivos colocados na pasta de importação ou de exportação são
   convertidos em segundo plano, com ícone na bandeja e notificações, mesmo com o Vinci
   fechado.
+- **Fica na bandeja.** Fechar a janela deixa o Vinci na bandeja do sistema. Na primeira vez
+  ele pergunta, e nas Configurações dá para fazê-lo sair de vez.
 - **Manutenção.**
   - Autodiagnóstico a cada abertura, com **Reparar** em um clique.
   - O Resolve é atualizado no lugar, e os drivers do container são atualizados junto.

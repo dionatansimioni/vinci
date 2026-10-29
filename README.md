@@ -49,6 +49,8 @@ Arch, openSUSE, Mint, Pop!_OS, Bazzite and others, and your system libraries are
   is used when available, with automatic CPU fallback.
 - **Watch folders.** Files dropped into the import or export folder are converted in the
   background, with a tray icon and notifications, even while Vinci is closed.
+- **Lives in the tray.** Closing the window keeps Vinci in the system tray. It asks the
+  first time, and Preferences can make it quit instead.
 - **Maintenance.**
   - Self-diagnosis runs on every start, with a one-click **Repair**.
   - Resolve updates are done in place, and the container's drivers are updated with them.
