@@ -12,7 +12,9 @@ const KNOWN: &[(&str, &[&str])] = &[
     ("ptyxis", &["--"]),
     ("kgx", &["--"]),
     ("gnome-terminal", &["--"]),
-    ("konsole", &["-e"]),
+    // --separate: otherwise a running Konsole takes over the window (often as a tab of
+    // the window Vinci was started from) and this process exits at once.
+    ("konsole", &["--separate", "-e"]),
     ("xfce4-terminal", &["-x"]),
     ("mate-terminal", &["-x"]),
     ("cosmic-term", &["-e"]),
@@ -151,7 +153,7 @@ mod tests {
     fn builds_the_command_per_terminal() {
         let inner = shell_in("/usr/bin/distrobox", "vinci-free", "Failed");
         let konsole = command("konsole", &inner).unwrap();
-        assert_eq!(konsole[..3], ["konsole", "-e", "sh"]);
+        assert_eq!(konsole[..4], ["konsole", "--separate", "-e", "sh"]);
         assert_eq!(
             konsole[konsole.len() - 4..],
             ["/usr/bin/distrobox", "enter", "--name", "vinci-free"]
@@ -210,7 +212,7 @@ mod tests {
     fn finds_the_first_installed_terminal() {
         let r = FakeRunner::default().respond(&["sh", "-c"], "konsole\nxterm\n", true);
         let a = find(&r, "KDE", &shell_in("distrobox", "vinci-free", "x")).unwrap();
-        assert_eq!(a[..2], ["konsole", "-e"]);
+        assert_eq!(a[..3], ["konsole", "--separate", "-e"]);
         // Every candidate is passed as an argument, never spliced into the script.
         let call = &r.calls()[0];
         assert!(call.contains(&"xterm".to_string()));
