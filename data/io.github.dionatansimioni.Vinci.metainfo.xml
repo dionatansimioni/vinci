@@ -48,6 +48,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.1" date="2026-10-29">
+      <description>
+        <p>Sound in DaVinci Resolve, the tray icon on KDE and Cinnamon, the container terminal opening in front of Vinci, and GPU decoding when converting media for import.</p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-10-29">
       <description>
         <p>Free and Studio installed side by side and managed from the home page, a status icon and stop button for each container, the Diolinux MPEG-4 conversion preset, only Resolve itself in the applications menu (Blackmagic's utility shortcuts are removed), and a terminal button that works on more desktops or shows the command to run.</p>
