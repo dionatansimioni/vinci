@@ -103,11 +103,6 @@ Translations live in `po/`. A test fails if any UI text is untranslated; run
 `scripts/update-po.sh` after changing strings. After changing dependencies, run
 `scripts/third-party.sh`.
 
-## Contributing
-
-Bug reports and pull requests are welcome. When reporting a problem, attach the diagnostic
-report. You can copy it from the About dialog, and it hides your user name.
-
 ## License
 
 Vinci is free software: GPL-3.0-or-later (see [LICENSE](LICENSE)). The licenses of the

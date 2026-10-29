@@ -105,12 +105,6 @@ As traduções ficam em `po/`. Um teste falha se algum texto da interface estive
 tradução; rode `scripts/update-po.sh` depois de mudar textos. Depois de mudar dependências,
 rode `scripts/third-party.sh`.
 
-## Contribuir
-
-Relatos de problemas e pull requests são bem-vindos. Ao relatar um problema, anexe o
-relatório de diagnóstico. Dá para copiá-lo na janela Sobre, e ele esconde o seu nome de
-usuário.
-
 ## Licença
 
 O Vinci é software livre: GPL-3.0 ou posterior (veja [LICENSE](LICENSE)). As licenças das
