@@ -42,8 +42,7 @@
     <div>
       <h1>DaVinci Resolve on <span>any Linux distro</span>.</h1>
       <p class="lead">Vinci checks your computer, installs Resolve in an isolated container with full
-        GPU acceleration, and converts the videos Resolve can't open on Linux. No terminal, no
-        changes to your system libraries.</p>
+        GPU acceleration, and converts the videos Resolve can't open on Linux. No terminal, and no changes to your system libraries.</p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/dionatansimioni/vinci/releases/latest">
           ⬇ Download AppImage
@@ -62,15 +61,15 @@
 <section id="how">
   <div class="wrap">
     <h2>Three steps</h2>
-    <p class="sub">DaVinci Resolve only supports Rocky Linux officially. Vinci gives it the
-      environment it expects, a pinned Ubuntu 24.04 container, so it behaves the same on every distro.</p>
+    <p class="sub">DaVinci Resolve is only officially supported on Rocky Linux. Vinci gives it a stable,
+      controlled environment, a pinned Ubuntu 24.04 container, so it behaves the same on every distro.</p>
     <ol class="steps">
       <li><h3>Check</h3><p>Vinci looks at your GPU, driver, memory and free disk space and explains
         in plain words what will work and what may not.</p></li>
       <li><h3>Download</h3><p>Get the free or Studio installer from Blackmagic Design's website.
-        Vinci finds it in your Downloads folder on its own, even while it is still downloading.</p></li>
-      <li><h3>Install</h3><p>One click. Vinci prepares podman and distrobox, builds the container,
-        installs Resolve and adds it to your app menu. Then just open it.</p></li>
+        Vinci finds it in your Downloads folder automatically, even while it is still downloading.</p></li>
+      <li><h3>Install</h3><p>With one click, Vinci prepares podman and distrobox, builds the container, installs
+        Resolve and adds it to your app menu. Then just open it.</p></li>
     </ol>
   </div>
 </section>
@@ -82,7 +81,7 @@
     <div class="grid">
       <div class="card"><span class="ico">🩺</span><h3>System check</h3>
         <p>GPU, driver, RAM (8 GiB minimum, 16 GiB recommended) and disk (12 GiB minimum, 40 GiB
-        recommended). It only blocks what certainly won't work; for anything else it warns and lets you continue.</p></div>
+        recommended). It only blocks what certainly won't work; for anything else, it warns you and lets you decide.</p></div>
       <div class="card"><span class="ico">📦</span><h3>Isolated container</h3>
         <p>Resolve runs in Ubuntu 24.04 through distrobox and podman, sharing your home folder.
         Your system libraries are never touched.</p></div>
@@ -90,35 +89,35 @@
         <p>NVIDIA through your system driver (CUDA), AMD through ROCm and Intel through the NEO
         runtime. Hybrid laptops use the dedicated GPU, and you can switch it in Preferences.</p></div>
       <div class="card"><span class="ico">🔎</span><h3>Finds the installer</h3>
-        <p>It detects the Free and Studio zips in Downloads, or opens Blackmagic's page and waits
-        for the file. Versions with known problems are flagged before you install.</p></div>
+        <p>It detects the Free and Studio installers in Downloads, or opens Blackmagic's page and
+        waits for the file. Before installing, it warns you about versions with known problems.</p></div>
       <div class="card"><span class="ico">🧩</span><h3>Desktop integration</h3>
-        <p>Menu entry with icon, <code>.drp</code>/<code>.drt</code> files open in Resolve, and
-        Blackmagic's broken utility shortcuts are tidied away.</p></div>
+        <p>A menu entry with an icon, <code>.drp</code>/<code>.drt</code> files that open in Resolve,
+        and Blackmagic's broken utility shortcuts tidied away.</p></div>
       <div class="card"><span class="ico">🔊</span><h3>Sound that works</h3>
         <p>Audio goes from the container straight to your desktop's PipeWire session, so Resolve plays
         sound like any other app.</p></div>
       <div class="card"><span class="ico">🎬</span><h3>Media conversion</h3>
         <p>Converts phone and camera footage into formats Resolve opens on Linux, and turns your
-        renders into MP4. GPU-accelerated when available, with automatic CPU fallback.</p></div>
+        renders into MP4. GPU-accelerated when available, with an automatic CPU fallback.</p></div>
       <div class="card"><span class="ico">📂</span><h3>Watch folders</h3>
-        <p>Drop files in a folder and they are converted in the background, with a tray icon and
+        <p>Drop files into a watch folder and they are converted in the background, with a tray icon and
         notifications, even with Vinci closed.</p></div>
       <div class="card"><span class="ico">🪟</span><h3>Lives in the tray</h3>
-        <p>Closing the window keeps Vinci in the system tray, one click away. The first time, it
-        asks; you can also make it quit instead in Preferences.</p></div>
+        <p>Closing the window keeps Vinci in the system tray, one click away. It asks the first
+        time, and you can change your choice in Preferences.</p></div>
       <div class="card"><span class="ico">🛟</span><h3>Self-diagnosis and repair</h3>
         <p>Every time it opens, Vinci checks the container, menu entry, GPU and driver. If something
-        broke, one “Repair” button fixes it.</p></div>
+        is wrong, the “Repair” button fixes it.</p></div>
       <div class="card"><span class="ico">⏪</span><h3>Restore point</h3>
-        <p>Before each update it saves the working version (5–10 GB), so “Go back to this version”
-        undoes an update that went wrong in seconds.</p></div>
+        <p>Before each update, Vinci saves the current version (5–10 GB), so “Go back to this
+        version” undoes a failed update in seconds.</p></div>
       <div class="card"><span class="ico">🔄</span><h3>Updates</h3>
         <p>It tells you when a new Resolve version is out and updates it in place, along with the
         container's GPU and video drivers. Projects and settings are always kept.</p></div>
       <div class="card"><span class="ico">💎</span><h3>Free and Studio</h3>
-        <p>Both editions, with license key or USB dongle. Switching edition installs into a new container
-        and offers to remove the old one.</p></div>
+        <p>Both editions are supported, and Studio can be activated with a license key or a USB
+        dongle. Switching editions installs into a new container and offers to remove the old one.</p></div>
       <div class="card"><span class="ico">🎛️</span><h3>Blackmagic hardware</h3>
         <p>Safe udev rules for the Studio dongle, Speed Editor and control panels, limited to Blackmagic devices.</p></div>
       <div class="card"><span class="ico">🧹</span><h3>Clean uninstall</h3>
@@ -128,13 +127,13 @@
         <p>For advanced users: a terminal inside Resolve's container, clearly marked
         <code>⬢ vinci-free</code>, and a button to open the installation folder.</p></div>
       <div class="card"><span class="ico">🔒</span><h3>Private by design</h3>
-        <p>No telemetry, ever. Optional local logs hide your user name, and a “Copy diagnostic report”
-        button makes bug reports easy.</p></div>
+        <p>No telemetry, ever. Optional local logs hide your user name, and the “Copy diagnostic report” button makes
+        reporting problems easy.</p></div>
       <div class="card"><span class="ico">🌐</span><h3>English and Portuguese</h3>
-        <p>Follows your system language, or pick one in Preferences.</p></div>
+        <p>Follows your system language, which you can also choose in Preferences.</p></div>
       <div class="card"><span class="ico">🛡️</span><h3>Built to last</h3>
-        <p>Pinned container image and distrobox version, a declarative recipe, a weekly automated
-        check of every external dependency, and offline-first behaviour.</p></div>
+        <p>A pinned container image and distrobox version, a declarative recipe and a weekly
+        automated check of every external dependency. What is installed keeps working offline.</p></div>
     </div>
   </div>
 </section>
@@ -142,7 +141,7 @@
 <section id="gpu">
   <div class="wrap">
     <h2>GPU support</h2>
-    <p class="sub">Resolve needs a GPU with compute support. Vinci sets up the right stack for yours.</p>
+    <p class="sub">Resolve needs a GPU with compute support. Vinci sets up the right components for yours.</p>
     <div class="table-scroll">
     <table>
       <thead><tr><th>GPU</th><th>How</th><th>Status</th><th>Notes</th></tr></thead>
@@ -150,9 +149,9 @@
         <tr><td>NVIDIA</td><td>Your system's proprietary driver (CUDA), shared with the container</td>
           <td><span class="tag ok">Tested</span></td><td>Install the proprietary driver on your system first; Vinci tells you if it is missing.</td></tr>
         <tr><td>AMD</td><td>ROCm inside the container</td>
-          <td><span class="tag exp">Experimental</span></td><td>RDNA and newer. RDNA1/Vega with a compatibility override. Polaris and older are not supported.</td></tr>
+          <td><span class="tag exp">Experimental</span></td><td>RDNA or newer; RDNA1/Vega with a compatibility override. Polaris and older are not supported.</td></tr>
         <tr><td>Intel</td><td>NEO compute runtime (OpenCL)</td>
-          <td><span class="tag exp">Experimental</span></td><td>Arc and 12th gen or newer. Blackmagic does not support Intel GPUs on Linux.</td></tr>
+          <td><span class="tag exp">Experimental</span></td><td>Arc and 12th-gen processors or newer. Blackmagic does not support Intel GPUs on Linux.</td></tr>
       </tbody>
     </table>
     </div>
@@ -164,13 +163,13 @@
     <div>
       <h2>Videos that just open</h2>
       <p class="sub">On Linux, Resolve can't read AAC audio in any edition, and the free edition can't
-        open H.264/H.265, which is what phones and most cameras record. Vinci converts them using
+        open H.264/H.265, the formats used by phones and most cameras. Vinci converts them using
         the ffmpeg from Ubuntu's repositories inside the container.</p>
       <div class="table-scroll">
       <table>
         <thead><tr><th>Preset</th><th>Use it for</th></tr></thead>
         <tbody>
-          <tr><td>DNxHR HQ</td><td>Editing in any edition. Large files (about 1 GB per minute in 1080p).</td></tr>
+          <tr><td>DNxHR HQ</td><td>Editing in Free and Studio. Large files (about 1 GB per minute in 1080p).</td></tr>
           <tr><td>ProRes 422</td><td>Editing, when you prefer ProRes. Large files.</td></tr>
           <tr><td>MPEG-4 (Diolinux preset)</td><td>Editing with much smaller files, every audio track kept. Optional size limit.</td></tr>
           <tr><td>Fix audio only</td><td>Studio with NVIDIA: keeps the video and only converts the audio to PCM.</td></tr>
@@ -180,8 +179,8 @@
       </table>
       </div>
       <p>Pick files in the <b>Media</b> tab, or set an <b>import</b> and an <b>export</b> watch folder
-        in Preferences: anything dropped there is converted automatically into a subfolder, while a
-        tray icon shows progress.</p>
+        in Preferences: anything dropped there is converted automatically into a subfolder, and the tray icon
+        shows the progress.</p>
     </div>
     <img class="shot-frame" src="img/media-en.png" width="720" height="680" loading="lazy"
          alt="Vinci's Media tab with the conversion preset picker">
@@ -191,7 +190,7 @@
 <section id="screens">
   <div class="wrap">
     <h2>Screenshots</h2>
-    <p class="sub">A native GTK 4 and libadwaita app that fits right into GNOME, KDE, Cinnamon and others.</p>
+    <p class="sub">A native GTK 4 and libadwaita app that fits right into GNOME, KDE, Cinnamon and other desktops.</p>
     <div class="shots">
       <figure><img class="shot-frame" src="img/main-en.png" width="720" height="680" loading="lazy" alt="Installation tab"><figcaption>Installation and system check</figcaption></figure>
       <figure><img class="shot-frame" src="img/media-en.png" width="720" height="680" loading="lazy" alt="Media tab"><figcaption>Media conversion</figcaption></figure>
@@ -210,7 +209,7 @@
         <li><a href="https://github.com/dionatansimioni/vinci/releases/latest">Download the AppImage</a>.</li>
         <li>Make it executable: right-click → Properties → “Allow executing as program”, or:
           <pre><code>chmod +x Vinci-*-x86_64.AppImage</code></pre></li>
-        <li>Open it. Vinci adds itself to your app menu so you can find it later.</li>
+        <li>Open it. Vinci adds a shortcut to your app menu so you can find it later.</li>
       </ol>
       <p>Vinci installs podman (asking for your password) and a private copy of distrobox if your
         system doesn't have them. Nothing else is installed outside your user folder.</p>
@@ -226,7 +225,8 @@
         <li>The DaVinci Resolve installer from <a href="https://www.blackmagicdesign.com/products/davinciresolve">Blackmagic Design</a></li>
       </ul>
       <p class="note">Tested on Ubuntu and on Fedora with KDE Plasma (Wayland) and Cinnamon.
-        Immutable systems such as Silverblue, Kinoite and Bazzite are detected and handled.</p>
+        Immutable systems such as Silverblue, Kinoite and Bazzite are also
+        supported: Vinci detects them and adapts.</p>
     </div>
   </div>
 </section>
@@ -240,14 +240,14 @@
     <details><summary>Is it free? Does it work with Studio?</summary>
       <p>Vinci is free software under the GPL-3.0. It installs both the free DaVinci Resolve and
       DaVinci Resolve Studio; Studio is activated with your own license key or USB dongle.</p></details>
-    <details><summary>Will it mess up my system?</summary>
-      <p>No. Resolve and its libraries live in a container. On your system Vinci only installs
+    <details><summary>Does Vinci change my system?</summary>
+      <p>Very little. Resolve and its libraries live in a container. On your system Vinci only installs
       podman (if missing, with your confirmation), a private distrobox in
       <code>~/.local/share/vinci</code>, a menu entry and, if you ask, udev rules for Blackmagic devices.
       The uninstaller removes exactly that.</p></details>
     <details><summary>Where are my projects?</summary>
       <p>In the same place Resolve always keeps them, in your home folder, which the container
-      shares. Updates and edition switches keep them; uninstalling keeps them unless you choose otherwise.</p></details>
+      shares. Updates and edition switches keep them, and so does uninstalling, unless you choose otherwise.</p></details>
     <details><summary>Does Vinci collect data?</summary>
       <p>No. It only contacts Blackmagic's public API to learn the latest Resolve version and this
       repository to read the list of versions with known problems. Logs are off by default and stay on your computer.</p></details>

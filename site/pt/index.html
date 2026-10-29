@@ -34,8 +34,8 @@
     <div>
       <h1>DaVinci Resolve em <span>qualquer distro Linux</span>.</h1>
       <p class="lead">O Vinci verifica o seu computador, instala o Resolve num container isolado com
-        aceleração total da GPU e converte os vídeos que o Resolve não abre no Linux. Sem terminal e
-        sem mexer nas bibliotecas do seu sistema.</p>
+        aceleração total da GPU e converte os vídeos que o Resolve não abre no Linux. Tudo sem
+        usar o terminal e sem alterar as bibliotecas do seu sistema.</p>
       <div class="cta">
         <a class="btn primary" href="https://github.com/dionatansimioni/vinci/releases/latest">
           ⬇ Baixar AppImage
@@ -54,15 +54,17 @@
 <section id="como">
   <div class="wrap">
     <h2>Três passos</h2>
-    <p class="sub">Oficialmente, o DaVinci Resolve só suporta o Rocky Linux. O Vinci dá a ele o
-      ambiente que ele espera, um container Ubuntu 24.04 fixado, e assim ele funciona igual em qualquer distro.</p>
+    <p class="sub">Oficialmente, o DaVinci Resolve só é suportado no Rocky Linux. O Vinci cria para ele um
+      ambiente estável e controlado, um container Ubuntu 24.04 de versão fixa, e assim ele funciona
+      da mesma forma em qualquer distro.</p>
     <ol class="steps">
-      <li><h3>Verificar</h3><p>O Vinci confere GPU, driver, memória e espaço em disco e explica em
-        português claro o que vai funcionar e o que pode dar problema.</p></li>
+      <li><h3>Verificar</h3><p>O Vinci confere GPU, driver, memória e espaço em disco e explica, em linguagem
+        simples, o que vai funcionar e o que pode dar problema.</p></li>
       <li><h3>Baixar</h3><p>Baixe o instalador gratuito ou o Studio no site da Blackmagic Design.
-        O Vinci encontra o arquivo na pasta Downloads sozinho, mesmo durante o download.</p></li>
-      <li><h3>Instalar</h3><p>Um clique. O Vinci prepara o podman e o distrobox, cria o container,
-        instala o Resolve e coloca o atalho no menu. Depois é só abrir.</p></li>
+        O Vinci encontra o arquivo na pasta Downloads automaticamente, mesmo enquanto ele ainda
+        está sendo baixado.</p></li>
+      <li><h3>Instalar</h3><p>Com um clique, o Vinci prepara o podman e o distrobox, cria o container, instala o
+        Resolve e adiciona o atalho ao menu. Depois, é só abrir.</p></li>
     </ol>
   </div>
 </section>
@@ -74,60 +76,62 @@
     <div class="grid">
       <div class="card"><span class="ico">🩺</span><h3>Verificação do sistema</h3>
         <p>GPU, driver, RAM (mínimo 8 GiB, recomendado 16 GiB) e disco (mínimo 12 GiB, recomendado
-        40 GiB). Só bloqueia o que certamente não funciona; no resto, avisa e deixa você seguir.</p></div>
+        40 GiB). Só bloqueia o que certamente não funcionaria; nos demais casos, avisa e deixa
+        você decidir.</p></div>
       <div class="card"><span class="ico">📦</span><h3>Container isolado</h3>
         <p>O Resolve roda num Ubuntu 24.04 via distrobox e podman, compartilhando a sua pasta pessoal.
         As bibliotecas do seu sistema nunca são alteradas.</p></div>
       <div class="card"><span class="ico">⚡</span><h3>Aceleração total da GPU</h3>
-        <p>NVIDIA pelo driver do seu sistema (CUDA), AMD via ROCm e Intel via runtime NEO. Notebooks
-        híbridos usam a GPU dedicada, e dá para trocar nas Configurações.</p></div>
+        <p>NVIDIA pelo driver do seu sistema (CUDA), AMD pelo ROCm e Intel pelo runtime NEO.
+        Notebooks híbridos usam a GPU dedicada, e é possível trocá-la nas Configurações.</p></div>
       <div class="card"><span class="ico">🔎</span><h3>Encontra o instalador</h3>
-        <p>Detecta os zips Free e Studio em Downloads, ou abre a página da Blackmagic e espera o
-        arquivo chegar. Versões com problemas conhecidos são avisadas antes de instalar.</p></div>
+        <p>Detecta os arquivos Free e Studio na pasta Downloads ou abre a página da Blackmagic e
+        aguarda o download. Antes de instalar, avisa se a versão tiver problemas conhecidos.</p></div>
       <div class="card"><span class="ico">🧩</span><h3>Integração com o desktop</h3>
-        <p>Atalho no menu com ícone, arquivos <code>.drp</code>/<code>.drt</code> abrem no Resolve,
-        e os atalhos quebrados dos utilitários da Blackmagic são removidos.</p></div>
-      <div class="card"><span class="ico">🔊</span><h3>Som funcionando</h3>
-        <p>O áudio sai do container direto para o PipeWire do seu desktop, então o Resolve toca som
-        como qualquer outro aplicativo.</p></div>
+        <p>Atalho no menu com ícone, abertura de arquivos <code>.drp</code>/<code>.drt</code> no
+        Resolve e remoção dos atalhos quebrados dos utilitários da Blackmagic.</p></div>
+      <div class="card"><span class="ico">🔊</span><h3>Som que funciona</h3>
+        <p>O áudio sai do container direto para o PipeWire do seu desktop, e o Resolve reproduz
+        som como qualquer outro aplicativo.</p></div>
       <div class="card"><span class="ico">🎬</span><h3>Conversão de mídia</h3>
         <p>Converte vídeos de celular e câmera para formatos que o Resolve abre no Linux e transforma
-        suas renderizações em MP4. Usa a GPU quando dá, com volta automática para a CPU.</p></div>
+        suas renderizações em MP4. Usa a GPU quando disponível, com volta automática para a CPU.</p></div>
       <div class="card"><span class="ico">📂</span><h3>Pastas monitoradas</h3>
-        <p>Coloque arquivos numa pasta e eles são convertidos em segundo plano, com ícone na bandeja
+        <p>Coloque arquivos numa pasta monitorada e eles serão convertidos em segundo plano, com ícone na bandeja
         e notificações, mesmo com o Vinci fechado.</p></div>
       <div class="card"><span class="ico">🪟</span><h3>Fica na bandeja</h3>
-        <p>Fechar a janela deixa o Vinci na bandeja do sistema, a um clique de distância. Na
-        primeira vez ele pergunta; nas Configurações dá para fazê-lo sair de vez.</p></div>
+        <p>Ao fechar a janela, o Vinci continua na bandeja do sistema, a um clique de distância.
+        Na primeira vez, ele pergunta o que você prefere; a escolha pode ser mudada nas Configurações.</p></div>
       <div class="card"><span class="ico">🛟</span><h3>Autodiagnóstico e reparo</h3>
-        <p>Toda vez que abre, o Vinci confere o container, o atalho, a GPU e o driver. Se algo
-        quebrou, um botão “Reparar” resolve.</p></div>
+        <p>Sempre que é aberto, o Vinci confere o container, o atalho, a GPU e o driver. Se algo
+        estiver errado, o botão “Reparar” corrige.</p></div>
       <div class="card"><span class="ico">⏪</span><h3>Ponto de restauração</h3>
-        <p>Antes de cada atualização ele salva a versão que funciona (5–10 GB), e “Voltar a esta
-        versão” desfaz em segundos uma atualização que deu errado.</p></div>
+        <p>Antes de cada atualização, o Vinci salva a versão atual (5–10 GB), e o botão “Voltar a
+        esta versão” desfaz em segundos uma atualização malsucedida.</p></div>
       <div class="card"><span class="ico">🔄</span><h3>Atualizações</h3>
-        <p>Avisa quando sai uma versão nova do Resolve e atualiza no lugar, junto com os drivers de
-        GPU e vídeo do container. Projetos e configurações são sempre preservados.</p></div>
+        <p>Avisa quando sai uma nova versão do Resolve e atualiza a instalação existente, junto
+        com os drivers de GPU e vídeo do container. Projetos e configurações são sempre preservados.</p></div>
       <div class="card"><span class="ico">💎</span><h3>Free e Studio</h3>
-        <p>As duas edições, com chave de licença ou dongle USB. Trocar de edição instala num
-        container novo e oferece remover o antigo.</p></div>
+        <p>As duas edições são suportadas, e o Studio pode ser ativado por chave de licença ou
+        dongle USB. Ao trocar de edição, o Vinci instala num container novo e oferece remover o antigo.</p></div>
       <div class="card"><span class="ico">🎛️</span><h3>Hardware da Blackmagic</h3>
         <p>Regras udev seguras para o dongle do Studio, o Speed Editor e os painéis de controle,
         restritas aos dispositivos da Blackmagic.</p></div>
       <div class="card"><span class="ico">🧹</span><h3>Desinstalação limpa</h3>
         <p>Remove só o que o Vinci instalou. Seus projetos ficam, a menos que você marque “apagar
-        também”, e o podman é mantido se outros containers o usam.</p></div>
+        também”, e o podman é mantido se outros containers o usarem.</p></div>
       <div class="card"><span class="ico">⌨️</span><h3>Terminal do container</h3>
         <p>Para usuários avançados: um terminal dentro do container do Resolve, marcado com
         <code>⬢ vinci-free</code>, e um botão para abrir a pasta da instalação.</p></div>
       <div class="card"><span class="ico">🔒</span><h3>Privacidade</h3>
-        <p>Nenhuma telemetria. Os logs são opcionais, ficam no seu computador e escondem o seu nome de
-        usuário, e o botão “Copiar relatório de diagnóstico” facilita relatar problemas.</p></div>
+        <p>Nenhuma telemetria. Os logs são opcionais, ficam no seu computador e ocultam o seu nome
+        de usuário. O botão “Copiar relatório de diagnóstico” facilita relatar problemas.</p></div>
       <div class="card"><span class="ico">🌐</span><h3>Português e inglês</h3>
-        <p>Segue o idioma do sistema, ou escolha um nas Configurações.</p></div>
+        <p>Segue o idioma do sistema, que também pode ser escolhido nas Configurações.</p></div>
       <div class="card"><span class="ico">🛡️</span><h3>Feito para durar</h3>
-        <p>Imagem do container e versão do distrobox fixadas, receita declarativa, verificação
-        automática semanal de todas as dependências externas e funcionamento offline.</p></div>
+        <p>Imagem do container e versão do distrobox fixas, receita declarativa e verificação
+        automática semanal das dependências externas. O que já está instalado continua
+        funcionando sem internet.</p></div>
     </div>
   </div>
 </section>
@@ -135,7 +139,7 @@
 <section id="gpu">
   <div class="wrap">
     <h2>Suporte a GPU</h2>
-    <p class="sub">O Resolve precisa de uma GPU com suporte a computação. O Vinci prepara o que a sua precisa.</p>
+    <p class="sub">O Resolve precisa de uma GPU com suporte a computação. O Vinci configura os componentes certos para a sua.</p>
     <div class="table-scroll">
     <table>
       <thead><tr><th>GPU</th><th>Como</th><th>Situação</th><th>Observações</th></tr></thead>
@@ -143,9 +147,9 @@
         <tr><td>NVIDIA</td><td>Driver proprietário do seu sistema (CUDA), compartilhado com o container</td>
           <td><span class="tag ok">Testado</span></td><td>Instale o driver proprietário no sistema antes; o Vinci avisa se estiver faltando.</td></tr>
         <tr><td>AMD</td><td>ROCm dentro do container</td>
-          <td><span class="tag exp">Experimental</span></td><td>RDNA e mais novas. RDNA1/Vega com ajuste de compatibilidade. Polaris e anteriores não são suportadas.</td></tr>
+          <td><span class="tag exp">Experimental</span></td><td>RDNA ou mais nova; RDNA1/Vega com ajuste de compatibilidade. Polaris e anteriores não são suportadas.</td></tr>
         <tr><td>Intel</td><td>Runtime de computação NEO (OpenCL)</td>
-          <td><span class="tag exp">Experimental</span></td><td>Arc e 12ª geração ou mais nova. A Blackmagic não suporta GPUs Intel no Linux.</td></tr>
+          <td><span class="tag exp">Experimental</span></td><td>Arc e processadores de 12ª geração ou mais novos. A Blackmagic não suporta GPUs Intel no Linux.</td></tr>
       </tbody>
     </table>
     </div>
@@ -156,25 +160,25 @@
   <div class="wrap split">
     <div>
       <h2>Vídeos que simplesmente abrem</h2>
-      <p class="sub">No Linux, o Resolve não lê áudio AAC em nenhuma edição, e a edição gratuita não
-        abre H.264/H.265, que é o que celulares e a maioria das câmeras gravam. O Vinci converte
+      <p class="sub">No Linux, o Resolve não lê áudio AAC em nenhuma edição, e a edição gratuita não abre H.264/H.265, os formatos usados por celulares e pela maioria
+        das câmeras. O Vinci converte
         esses arquivos com o ffmpeg dos repositórios do Ubuntu, dentro do container.</p>
       <div class="table-scroll">
       <table>
         <thead><tr><th>Perfil</th><th>Para que serve</th></tr></thead>
         <tbody>
-          <tr><td>DNxHR HQ</td><td>Editar em qualquer edição. Arquivos grandes (cerca de 1 GB por minuto em 1080p).</td></tr>
-          <tr><td>ProRes 422</td><td>Editar, se você prefere ProRes. Arquivos grandes.</td></tr>
-          <tr><td>MPEG-4 (preset Diolinux)</td><td>Editar com arquivos bem menores, mantendo todas as faixas de áudio. Limite de resolução opcional.</td></tr>
+          <tr><td>DNxHR HQ</td><td>Edição no Free e no Studio. Arquivos grandes (cerca de 1 GB por minuto em 1080p).</td></tr>
+          <tr><td>ProRes 422</td><td>Edição, para quem prefere ProRes. Arquivos grandes.</td></tr>
+          <tr><td>MPEG-4 (preset Diolinux)</td><td>Edição com arquivos bem menores, mantendo todas as faixas de áudio. Limite de resolução opcional.</td></tr>
           <tr><td>Só corrigir o áudio</td><td>Studio com NVIDIA: mantém o vídeo e só converte o áudio para PCM.</td></tr>
-          <tr><td>MP4 H.264</td><td>Publicar sua renderização (YouTube, web).</td></tr>
-          <tr><td>MP4 H.265</td><td>Publicar com arquivos menores.</td></tr>
+          <tr><td>MP4 H.264</td><td>Publicação da sua renderização (YouTube, web).</td></tr>
+          <tr><td>MP4 H.265</td><td>Publicação com arquivos menores.</td></tr>
         </tbody>
       </table>
       </div>
       <p>Escolha os arquivos na aba <b>Mídia</b>, ou defina uma pasta monitorada de <b>importação</b>
-        e outra de <b>exportação</b> nas Configurações: tudo o que cair nelas é convertido
-        automaticamente para uma subpasta, e um ícone na bandeja mostra o andamento.</p>
+        e outra de <b>exportação</b> nas Configurações: todo arquivo colocado nelas é convertido automaticamente para uma subpasta, e o ícone
+        na bandeja mostra o andamento.</p>
     </div>
     <img class="shot-frame" src="../img/media-pt.png" width="720" height="680" loading="lazy"
          alt="Aba Mídia do Vinci com a escolha do perfil de conversão">
@@ -184,7 +188,7 @@
 <section id="telas">
   <div class="wrap">
     <h2>Telas</h2>
-    <p class="sub">Um aplicativo nativo em GTK 4 e libadwaita, que combina com GNOME, KDE, Cinnamon e outros.</p>
+    <p class="sub">Um aplicativo nativo em GTK 4 e libadwaita, que se integra ao GNOME, KDE, Cinnamon e outros ambientes.</p>
     <div class="shots">
       <figure><img class="shot-frame" src="../img/main-pt.png" width="720" height="680" loading="lazy" alt="Aba Instalação"><figcaption>Instalação e verificação do sistema</figcaption></figure>
       <figure><img class="shot-frame" src="../img/media-pt.png" width="720" height="680" loading="lazy" alt="Aba Mídia"><figcaption>Conversão de mídia</figcaption></figure>
@@ -203,7 +207,7 @@
         <li><a href="https://github.com/dionatansimioni/vinci/releases/latest">Baixe o AppImage</a>.</li>
         <li>Torne-o executável: botão direito → Propriedades → “Permitir executar como programa”, ou:
           <pre><code>chmod +x Vinci-*-x86_64.AppImage</code></pre></li>
-        <li>Abra. O Vinci se adiciona ao menu de aplicativos para você encontrá-lo depois.</li>
+        <li>Abra o arquivo. O Vinci cria um atalho no menu de aplicativos para você encontrá-lo depois.</li>
       </ol>
       <p>Se o seu sistema não tiver, o Vinci instala o podman (pedindo sua senha) e uma cópia
         própria do distrobox. Nada mais é instalado fora da sua pasta de usuário.</p>
@@ -218,8 +222,8 @@
         <li>Conexão com a internet na primeira instalação</li>
         <li>O instalador do DaVinci Resolve, do site da <a href="https://www.blackmagicdesign.com/br/products/davinciresolve">Blackmagic Design</a></li>
       </ul>
-      <p class="note">Testado no Ubuntu e no Fedora com KDE Plasma (Wayland) e Cinnamon. Sistemas
-        imutáveis como Silverblue, Kinoite e Bazzite são detectados e tratados.</p>
+      <p class="note">Testado no Ubuntu e no Fedora com KDE Plasma (Wayland) e Cinnamon. Sistemas imutáveis, como Silverblue, Kinoite e Bazzite, também são
+        suportados: o Vinci os detecta e se adapta.</p>
     </div>
   </div>
 </section>
@@ -233,19 +237,20 @@
     <details><summary>É gratuito? Funciona com o Studio?</summary>
       <p>O Vinci é software livre sob a GPL-3.0. Ele instala tanto o DaVinci Resolve gratuito quanto
       o DaVinci Resolve Studio; o Studio é ativado com a sua chave de licença ou dongle USB.</p></details>
-    <details><summary>Ele vai bagunçar o meu sistema?</summary>
-      <p>Não. O Resolve e as bibliotecas dele ficam num container. No seu sistema, o Vinci só
+    <details><summary>O Vinci altera o meu sistema?</summary>
+      <p>Muito pouco. O Resolve e as bibliotecas dele ficam num container. No seu sistema, o Vinci só
       instala o podman (se faltar, com sua confirmação), um distrobox próprio em
       <code>~/.local/share/vinci</code>, o atalho no menu e, se você pedir, regras udev para
       dispositivos da Blackmagic. O desinstalador remove exatamente isso.</p></details>
     <details><summary>Onde ficam os meus projetos?</summary>
       <p>No mesmo lugar de sempre do Resolve, na sua pasta pessoal, que o container compartilha.
-      Atualizações e trocas de edição os preservam; a desinstalação também, a menos que você escolha apagar.</p></details>
+      Atualizações e trocas de edição os preservam, e a desinstalação também, a menos que você
+      escolha apagá-los.</p></details>
     <details><summary>O Vinci coleta dados?</summary>
       <p>Não. Ele só consulta a API pública da Blackmagic para saber a versão mais recente do Resolve
-      e este repositório para ler a lista de versões com problemas. Os logs vêm desligados e ficam no seu computador.</p></details>
-    <details><summary>Deu algo errado. Como relato?</summary>
-      <p>Use “Copiar relatório de diagnóstico” no Vinci (ele esconde o seu nome de usuário) e
+      e este repositório para ler a lista de versões com problemas. Os logs vêm desativados por padrão e ficam no seu computador.</p></details>
+    <details><summary>Algo deu errado. Como relato o problema?</summary>
+      <p>Use “Copiar relatório de diagnóstico” no Vinci (ele oculta o seu nome de usuário) e
       <a href="https://github.com/dionatansimioni/vinci/issues">abra uma issue no GitHub</a>.</p></details>
   </div>
 </section>
@@ -257,7 +262,7 @@
       <h2>Sobre</h2>
       <p>O Vinci é criado e mantido por <b>Dionatan Simioni</b>, do Diolinux, para tornar a
         edição de vídeo profissional no Linux simples para todo mundo.</p>
-      <p class="credits">Feito sobre o trabalho das comunidades do
+      <p class="credits">Construído sobre o trabalho das comunidades do
         <a href="https://distrobox.it">distrobox</a>, <a href="https://podman.io">Podman</a>,
         <a href="https://gtk.org">GTK</a>, <a href="https://gnome.pages.gitlab.gnome.org/libadwaita/">libadwaita</a>,
         <a href="https://relm4.org">Relm4</a>, <a href="https://ffmpeg.org">FFmpeg</a> e

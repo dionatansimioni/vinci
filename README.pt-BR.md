@@ -18,10 +18,11 @@ Um instalador não oficial que roda o Resolve num container isolado com acelera�
 > Resolve é marca registrada da Blackmagic Design Pty. Ltd. O Vinci não inclui nem
 > redistribui o Resolve: você baixa o instalador oficial no site da Blackmagic.
 
-Oficialmente, o DaVinci Resolve só suporta o Rocky Linux. O Vinci dá a ele o ambiente que
-ele espera: um container Ubuntu 24.04 fixado, rodando com [distrobox](https://distrobox.it)
-e podman, com acesso direto à sua GPU. Assim o Resolve funciona igual no Ubuntu, Fedora,
-Arch, openSUSE, Mint, Pop!_OS, Bazzite e outras, sem mexer nas bibliotecas do seu sistema.
+Oficialmente, o DaVinci Resolve só é suportado no Rocky Linux. O Vinci cria para ele um
+ambiente estável e controlado: um container Ubuntu 24.04 de versão fixa, rodando com
+[distrobox](https://distrobox.it) e podman, com acesso direto à sua GPU. Assim o Resolve
+funciona da mesma forma no Ubuntu, Fedora, Arch, openSUSE, Mint, Pop!_OS, Bazzite e outras,
+sem alterar as bibliotecas do seu sistema.
 
 ## Recursos
 
