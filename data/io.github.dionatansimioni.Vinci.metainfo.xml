@@ -63,6 +63,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.5" date="2026-10-29">
+      <description>
+        <p>Closing the window keeps Vinci in the system tray, with an option to quit instead.</p>
+      </description>
+    </release>
     <release version="0.4.4" date="2026-10-29">
       <description>
         <p>The container terminal marks its prompt with the container's name, so it can't be mistaken for the computer's own shell.</p>
