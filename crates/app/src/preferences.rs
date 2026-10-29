@@ -91,29 +91,94 @@ fn open_folder(dir: &Path, window: Option<&gtk::Window>) {
     );
 }
 
-/// A shell inside the Resolve container, in the user's terminal emulator. On failure,
-/// the reason and the command to type by hand.
-fn open_terminal(container: &str) -> Result<(), (String, String)> {
+/// A shell inside the Resolve container, in the user's terminal emulator. When none can
+/// be started, or it closes with an error right away, the reason and the command to type
+/// by hand.
+fn open_terminal(container: &str, parent: &adw::PreferencesDialog) {
     let runner = HostRunner::new();
     let dbx = tools::detect(&runner, &Recipe::bundled(), &rli_core::state::home())
         .distrobox
         .executable();
     let manual = terminal::manual_command(dbx.as_deref().unwrap_or("distrobox"), container);
-    let fail = |reason: String| (reason, manual.clone());
-    let dbx = dbx.ok_or_else(|| fail(tr("distrobox is missing")))?;
+    let Some(dbx) = dbx else {
+        show_manual_terminal(parent, &tr("distrobox is missing"), manual);
+        return;
+    };
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let on_error =
         tr("The container's shell ended with an error (see above). Press Enter to close.");
-    let argv = terminal::find(
+    let Some(argv) = terminal::find(
         &runner,
         &desktop,
         &terminal::shell_in(&dbx, container, &on_error),
-    )
-    .ok_or_else(|| fail(tr("No terminal app found on this computer.")))?;
-    runner.spawn_detached(&argv).map_err(|e| {
-        rli_core::log::info(&format!("terminal did not start: {e}"));
-        fail(e.to_string())
-    })
+    ) else {
+        show_manual_terminal(
+            parent,
+            &tr("No terminal app found on this computer."),
+            manual,
+        );
+        return;
+    };
+    let err_path = std::env::temp_dir().join(format!("vinci-terminal-{}.log", std::process::id()));
+    let started = std::fs::File::create(&err_path)
+        .and_then(|err| runner.spawn_window(&argv, &activation_env(parent), err));
+    let mut child = match started {
+        Ok(c) => c,
+        Err(e) => {
+            rli_core::log::info(&format!("terminal did not start: {e}"));
+            show_manual_terminal(parent, &e.to_string(), manual);
+            return;
+        }
+    };
+    // Some terminals hand the window to a server and exit 0 at once (GNOME Terminal);
+    // a quick exit with an error means no window ever showed up.
+    let parent = parent.clone();
+    let opened = std::time::Instant::now();
+    gtk::glib::spawn_future_local(async move {
+        let status = gio::spawn_blocking(move || child.wait()).await;
+        let errors = std::fs::read_to_string(&err_path).unwrap_or_default();
+        let _ = std::fs::remove_file(&err_path);
+        let Ok(Ok(status)) = status else { return };
+        rli_core::log::info(&format!(
+            "terminal ended ({status}) after {}s{}",
+            opened.elapsed().as_secs(),
+            if errors.trim().is_empty() {
+                String::new()
+            } else {
+                format!(":\n{}", errors.trim_end())
+            }
+        ));
+        if !status.success() && opened.elapsed() < std::time::Duration::from_secs(5) {
+            let last = errors.lines().rev().find(|l| !l.trim().is_empty());
+            let reason = match last {
+                Some(l) => {
+                    tr("The terminal closed right away: {error}").replace("{error}", l.trim())
+                }
+                None => tr("The terminal closed right away."),
+            };
+            show_manual_terminal(&parent, &reason, manual);
+        }
+    });
+}
+
+/// Variables that let the new window take the focus. On Wayland a window opened without
+/// an activation token from the app the user clicked in stays behind it (KDE, GNOME),
+/// as if nothing had happened.
+fn activation_env(widget: &impl IsA<gtk::Widget>) -> Vec<(String, String)> {
+    let display = widget.display();
+    if !display.backend().is_wayland() {
+        return Vec::new();
+    }
+    display
+        .app_launch_context()
+        .startup_notify_id(None::<&gio::AppInfo>, &[])
+        .map(|token| {
+            ["XDG_ACTIVATION_TOKEN", "DESKTOP_STARTUP_ID"]
+                .iter()
+                .map(|k| (k.to_string(), token.to_string()))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 /// When no terminal could be opened: the command to type in one, ready to copy.
@@ -188,9 +253,7 @@ fn advanced_group(
             let (dialog, container) = (dialog.clone(), target.map(|i| i.container));
             move |_| {
                 if let Some(c) = &container {
-                    if let Err((reason, command)) = open_terminal(c) {
-                        show_manual_terminal(&dialog, &reason, command);
-                    }
+                    open_terminal(c, &dialog);
                 }
             }
         });

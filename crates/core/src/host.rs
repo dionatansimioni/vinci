@@ -36,6 +36,20 @@ impl ExecMode {
         }
     }
 
+    /// [`Self::wrap`] with variables for the program: `flatpak-spawn` doesn't pass our
+    /// environment to the host, so it gets them as `--env` options.
+    pub fn wrap_env(self, argv: &[String], env: &[(String, String)]) -> Vec<String> {
+        match self {
+            Self::Direct => argv.to_vec(),
+            Self::FlatpakSpawn => {
+                let mut a = vec!["flatpak-spawn".to_string(), "--host".to_string()];
+                a.extend(env.iter().map(|(k, v)| format!("--env={k}={v}")));
+                a.extend(argv.iter().cloned());
+                a
+            }
+        }
+    }
+
     /// Wraps `argv` so it runs on the host as root, asking via polkit.
     pub fn wrap_root(self, argv: &[String]) -> Vec<String> {
         let with_pkexec: Vec<String> = std::iter::once("pkexec".to_string())
@@ -194,6 +208,32 @@ impl HostRunner {
             .stderr(std::process::Stdio::null())
             .spawn()
             .map(drop)
+    }
+}
+
+impl HostRunner {
+    /// Starts a window of its own (a terminal) with extra variables, its errors going to
+    /// `stderr`, and hands back the process so the caller can tell if it died at once.
+    pub fn spawn_window(
+        &self,
+        argv: &[String],
+        env: &[(String, String)],
+        stderr: std::fs::File,
+    ) -> std::io::Result<std::process::Child> {
+        let argv = self.mode.wrap_env(argv, env);
+        let (program, args) = argv
+            .split_first()
+            .ok_or_else(|| std::io::Error::other("empty command"))?;
+        crate::log::command(&argv);
+        let mut cmd = command(program);
+        if self.mode == ExecMode::Direct {
+            cmd.envs(env.iter().map(|(k, v)| (k, v)));
+        }
+        cmd.args(args)
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(stderr)
+            .spawn()
     }
 }
 
@@ -433,6 +473,24 @@ mod tests {
                 "-y",
                 "podman"
             ]
+        );
+    }
+
+    #[test]
+    fn passes_variables_through_flatpak_spawn() {
+        let env = [("XDG_ACTIVATION_TOKEN".to_string(), "t1".to_string())];
+        let a = argv(&["konsole", "-e", "sh"]);
+        assert_eq!(ExecMode::Direct.wrap_env(&a, &env), a);
+        assert_eq!(
+            ExecMode::FlatpakSpawn.wrap_env(&a, &env),
+            argv(&[
+                "flatpak-spawn",
+                "--host",
+                "--env=XDG_ACTIVATION_TOKEN=t1",
+                "konsole",
+                "-e",
+                "sh"
+            ])
         );
     }
 
