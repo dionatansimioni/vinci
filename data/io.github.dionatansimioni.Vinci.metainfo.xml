@@ -48,6 +48,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.3" date="2026-10-29">
+      <description>
+        <p>The container terminal stays open with the exit code when the shell ends right away, and the log records how it ended.</p>
+      </description>
+    </release>
     <release version="0.4.2" date="2026-10-29">
       <description>
         <p>The tray icon shows whenever Vinci is open, and the container terminal opens in its own Konsole window.</p>
