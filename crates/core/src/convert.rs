@@ -1,7 +1,7 @@
 //! Running conversions: ffmpeg inside the Resolve container, live progress, and the
 //! bookkeeping for watch folders.
 
-use crate::ffmpeg::{self, Encoder, ExportPreset, VideoCodec};
+use crate::ffmpeg::{self, Encoder, ExportPreset, ImportPreset, VideoCodec};
 use crate::gpu::Vendor;
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader};
@@ -168,6 +168,29 @@ pub fn convert_file(
         return Err(ConvertError::NoOutput);
     }
     Ok(out)
+}
+
+/// Converts `input` so Resolve can import it, decoding on the GPU when possible. If that
+/// attempt fails (a broken hardware decoder), the file is converted again on the CPU.
+pub fn convert_import(
+    engine: &Engine,
+    input: &Path,
+    out_dir: &Path,
+    preset: ImportPreset,
+    mut on_progress: impl FnMut(Option<f64>),
+) -> Result<PathBuf, ConvertError> {
+    let (argv, out) = ffmpeg::import_command(input, out_dir, preset);
+    if let Some(gpu) = ffmpeg::with_gpu_decode(&argv) {
+        match convert_file(engine, (gpu, out.clone()), input, &mut on_progress) {
+            Err(ConvertError::Failed { .. }) => {
+                // The name was free before this attempt, so whatever is there is ours.
+                let _ = std::fs::remove_file(&out);
+                crate::log::info("GPU decoding failed for this file, trying the CPU");
+            }
+            result => return result,
+        }
+    }
+    convert_file(engine, (argv, out), input, on_progress)
 }
 
 /// Encoders that pass a test encode in this engine, best first, always ending with the
@@ -404,8 +427,9 @@ mod tests {
         assert!(too_soon.is_empty(), "files still being written are skipped");
     }
 
-    /// The first encoder fails on the file: its partial output goes, the next one runs.
-    /// Uses a fake ffmpeg (a shell script) so it runs anywhere.
+    /// The first encoder (or the GPU decoder) fails on the file: its partial output goes,
+    /// the next attempt runs. Uses a fake ffmpeg (a shell script) so it runs anywhere; one
+    /// test for both, since PATH is shared by every test in the process.
     #[test]
     fn falls_back_to_the_next_encoder_and_cleans_up() {
         let dir = std::env::temp_dir().join(format!("rli-fallback-{}", std::process::id()));
@@ -417,7 +441,7 @@ mod tests {
         let fake = bin.join("ffmpeg");
         std::fs::write(
             &fake,
-            "#!/bin/sh\nfor a; do out=$a; done\necho partial > \"$out\"\ncase \"$*\" in *nvenc*) echo 'nvenc broke' >&2; exit 1;; esac\necho progress=end\n",
+            "#!/bin/sh\nfor a; do out=$a; done\necho partial > \"$out\"\ncase \"$*\" in *nvenc*|*hwaccel*) echo 'gpu broke' >&2; exit 1;; esac\necho progress=end\n",
         )
         .unwrap();
         use std::os::unix::fs::PermissionsExt;
@@ -445,6 +469,14 @@ mod tests {
             .map(|e| e.file_name().to_string_lossy().into_owned())
             .filter(|n| n.ends_with(".mp4"))
             .collect();
+        let imported =
+            convert_import(&Engine::Direct, &input, &dir, ImportPreset::DnxhrHq, |_| {}).unwrap();
+        let movs: Vec<_> = std::fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
+            .filter(|n| n.ends_with(".mov") && n != "render.mov")
+            .collect();
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(out.file_name().unwrap(), "render_web.mp4");
         assert_eq!(
@@ -452,6 +484,8 @@ mod tests {
             ["render_web.mp4"],
             "the failed attempt left nothing behind"
         );
+        assert_eq!(imported.file_name().unwrap(), "render_dnxhr.mov");
+        assert_eq!(movs, ["render_dnxhr.mov"], "the CPU retry reused the name");
     }
 
     /// Against a real Resolve container: a VAAPI device without its driver (the error a

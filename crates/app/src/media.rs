@@ -390,12 +390,9 @@ impl Component for Media {
                             let _ = out.send(MediaCmd::Progress(i, f));
                         };
                         let result = match choice {
-                            Choice::Import(p) => convert::convert_file(
-                                &engine,
-                                ffmpeg::import_command(&input, &dir, p),
-                                &input,
-                                progress,
-                            ),
+                            Choice::Import(p) => {
+                                convert::convert_import(&engine, &input, &dir, p, progress)
+                            }
                             Choice::Export(p) => convert::convert_export(
                                 &engine, &input, &dir, p, &encoders, progress,
                             ),

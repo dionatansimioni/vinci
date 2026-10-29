@@ -298,6 +298,22 @@ pub fn import_command(
     (a, out)
 }
 
+/// An [`import_command`] that decodes the source on the GPU (NVDEC, VA-API) when the
+/// machine has a decoder for it. DNxHR, ProRes and MPEG-4 have no hardware encoder on
+/// Linux, so decoding the phone's H.264/H.265 is where the GPU helps. ffmpeg uses the
+/// CPU on its own when no hardware decoder fits; `None` when there is nothing to decode
+/// (the video is copied).
+pub fn with_gpu_decode(argv: &[String]) -> Option<Vec<String>> {
+    let input = argv.iter().position(|a| a == "-i")?;
+    let copies_video = argv.windows(2).any(|w| w[0] == "-c:v" && w[1] == "copy");
+    if copies_video {
+        return None;
+    }
+    let mut a = argv.to_vec();
+    a.splice(input..input, args(&["-hwaccel", "auto"]));
+    Some(a)
+}
+
 /// Options before the input (device setup) and the video encoding options.
 fn video_args(encoder: &Encoder, s: ExportSettings) -> (Vec<String>, Vec<String>) {
     let q = s.quality.to_string();
@@ -525,6 +541,18 @@ mod tests {
         std::fs::remove_dir_all(&dir).unwrap();
         assert_eq!(out, dir.join("clip_dnxhr (3).mov"));
         assert_eq!(a.last().unwrap(), &out.to_string_lossy());
+    }
+
+    #[test]
+    fn import_decodes_on_the_gpu_unless_the_video_is_copied() {
+        let dir = Path::new("/nonexistent-out");
+        let (a, _) = import_command(Path::new("/v/clip.mp4"), dir, ImportPreset::DnxhrHq);
+        let gpu = with_gpu_decode(&a).unwrap();
+        let i = gpu.iter().position(|x| x == "-i").unwrap();
+        assert_eq!(gpu[i - 2..i], ["-hwaccel", "auto"], "an input option");
+        assert_eq!(gpu.len(), a.len() + 2);
+        let (copy, _) = import_command(Path::new("/v/clip.mp4"), dir, ImportPreset::AudioOnly);
+        assert!(with_gpu_decode(&copy).is_none());
     }
 
     #[test]

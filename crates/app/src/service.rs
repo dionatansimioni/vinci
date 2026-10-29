@@ -191,12 +191,9 @@ pub fn run() -> i32 {
                 }
             };
             let result = match job.kind {
-                Kind::Import(p) => convert::convert_file(
-                    &engine,
-                    ffmpeg::import_command(&job.input, &job.out_dir, p),
-                    &job.input,
-                    progress,
-                ),
+                Kind::Import(p) => {
+                    convert::convert_import(&engine, &job.input, &job.out_dir, p, progress)
+                }
                 Kind::Export(p) => {
                     let codec = p.settings().codec;
                     if encoders.as_ref().is_none_or(|(c, _)| *c != codec) {
