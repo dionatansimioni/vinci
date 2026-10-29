@@ -16,12 +16,14 @@ use rli_core::hardware::{self, Report};
 use rli_core::health::{self, Problem, Repair};
 use rli_core::host::{HostRunner, Runner};
 use rli_core::installer::Event;
+use rli_core::installer_file::Edition;
 use rli_core::installer_file::{self, parse_filename, InstallerFile};
 use rli_core::recipe::Recipe;
 use rli_core::remote::{self, UpdateInfo};
-use rli_core::state::{self, InstalledTool, State, ToolSource};
+use rli_core::state::{self, Installation, InstalledTool, State, ToolSource};
 use rli_core::tools::{self, Action};
 use rli_core::{diagnostics, integrate, launcher};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -128,9 +130,16 @@ pub struct App {
     error: Option<(String, String)>,
     toasts: adw::ToastOverlay,
     _media: Controller<Media>,
-    installed: Option<rli_core::state::Installation>,
-    update: Option<UpdateInfo>,
-    problems: Vec<Problem>,
+    /// Every install (Free and Studio can live side by side), Free first.
+    installed: Vec<Installation>,
+    updates: Vec<(Edition, UpdateInfo)>,
+    /// Problems found by the self-check, with the container they belong to.
+    problems: Vec<(String, Problem)>,
+    /// Containers running right now, for the status icon of each install.
+    running: BTreeSet<String>,
+    /// Containers being stopped right now (their button waits).
+    stopping: BTreeSet<String>,
+    polling: bool,
     backup: Option<rli_core::state::Installation>,
     restoring: bool,
     usb_configured: bool,
@@ -146,15 +155,22 @@ pub enum Msg {
     Install(usize),
     SetupHost(Vec<Action>, InstallerFile),
     StartInstall(InstallerFile),
+    /// Starts the install that just finished (the "installed" page).
     OpenResolve,
-    AskUninstall,
+    /// Starts the install living in this container.
+    Open(String),
+    AskUninstall(String),
+    /// Removes one install while another stays.
+    RemoveInstallation(String),
+    PollStatus,
+    /// Stops a running container (and Resolve with it), freeing its memory.
+    Stop(String),
     SetupUsb,
     Preferences,
     About,
     SettingsChanged,
     Restore,
-    RemoveContainer(String),
-    Repair(Repair),
+    Repair(String, Repair),
     RunHealth,
     Uninstall {
         delete_projects: bool,
@@ -173,9 +189,13 @@ pub enum Cmd {
     Progress(Event),
     HostStep(usize, rli_core::container::StepKind),
     Finished(Result<Outcome, (String, String)>),
-    Update(UpdateInfo),
+    Update(Edition, UpdateInfo),
     Uninstalled(rli_core::uninstall::Summary),
-    Health(Vec<Problem>),
+    InstallationRemoved(String, rli_core::uninstall::Summary),
+    Health(Vec<(String, Problem)>),
+    Status(BTreeSet<String>),
+    /// A container finished stopping; the fresh list of running ones.
+    Stopped(String, BTreeSet<String>),
     Restored(Result<rli_core::state::Installation, String>),
     UsbConfigured(Result<usize, String>),
     /// Host tools are in place (those listed were installed now); go on with Resolve.
@@ -189,8 +209,11 @@ pub enum Cmd {
 
 pub struct Widgets {
     installed_group: adw::PreferencesGroup,
-    installed_row: adw::ActionRow,
-    problem_rows: Vec<adw::ActionRow>,
+    /// One row per install plus its problems; rebuilt only when `install_sig` changes,
+    /// so a status poll never swaps a button out from under the pointer.
+    install_rows: Vec<adw::ActionRow>,
+    install_sig: String,
+    extras_group: adw::PreferencesGroup,
     restore_row: adw::ActionRow,
     usb_row: adw::ActionRow,
     usb_button: gtk::Button,
@@ -248,6 +271,71 @@ fn sync_background_service() {
             .stderr(std::process::Stdio::null())
             .spawn();
     }
+}
+
+/// A dot, green while the container runs and grey when it is stopped.
+fn status_icon(running: bool) -> gtk::Image {
+    let icon = gtk::Image::from_icon_name("media-record-symbolic");
+    icon.add_css_class(if running { "success" } else { "dim-label" });
+    icon.set_tooltip_text(Some(&if running {
+        tr("Container running")
+    } else {
+        tr("Container stopped")
+    }));
+    icon
+}
+
+/// Deletes the shortcuts Blackmagic's installer leaves for Resolve's utilities (they
+/// don't work outside the container); Vinci's own entry is the only one in the menu.
+fn tidy_menu(
+    runner: &dyn Runner,
+    recipe: &Recipe,
+    home: &std::path::Path,
+    data_home: &std::path::Path,
+) {
+    let config_home = state::host_xdg_dir("XDG_CONFIG_HOME", ".config");
+    integrate::remove_blackmagic_shortcuts(runner, recipe, home, data_home, &config_home);
+}
+
+/// How often the status icons of the installs are refreshed.
+const STATUS_POLL_SECS: u32 = 4;
+
+fn installations() -> Vec<Installation> {
+    State::load(&State::default_path())
+        .map(|s| s.installations)
+        .unwrap_or_default()
+}
+
+/// `podman stop` with a short grace period: Resolve gets a moment to close.
+fn stop_command(container: &str) -> Vec<String> {
+    ["podman", "stop", "--time", "5", container]
+        .map(String::from)
+        .to_vec()
+}
+
+/// Names of the running containers whose name starts with `prefix`.
+fn running_containers(runner: &dyn Runner, prefix: &str) -> BTreeSet<String> {
+    runner
+        .run(&[
+            "podman".into(),
+            "ps".into(),
+            "--format".into(),
+            "{{.Names}}".into(),
+        ])
+        .ok()
+        .filter(|o| o.success)
+        .map(|o| ours(&o.stdout, prefix))
+        .unwrap_or_default()
+}
+
+/// Vinci's containers among the names `podman ps` printed, one per line.
+fn ours(names: &str, prefix: &str) -> BTreeSet<String> {
+    names
+        .lines()
+        .map(str::trim)
+        .filter(|n| n.starts_with(prefix))
+        .map(String::from)
+        .collect()
 }
 
 fn settings() -> rli_core::settings::Settings {
@@ -392,11 +480,12 @@ impl Component for App {
             error: None,
             toasts: toasts.clone(),
             _media: media,
-            installed: State::load(&State::default_path())
-                .ok()
-                .and_then(|s| s.installation),
-            update: None,
+            installed: installations(),
+            updates: Vec::new(),
             problems: Vec::new(),
+            running: BTreeSet::new(),
+            stopping: BTreeSet::new(),
+            polling: false,
             backup: State::load(&State::default_path())
                 .ok()
                 .and_then(|s| s.backup),
@@ -415,18 +504,11 @@ impl Component for App {
             .title(tr("System check"))
             .build();
         let check_group = adw::PreferencesGroup::new();
-        let installed_group = adw::PreferencesGroup::builder().margin_bottom(24).build();
-        let installed_row = adw::ActionRow::new();
-        installed_row.add_prefix(&gtk::Image::from_icon_name("object-select-symbolic"));
-        let open_installed = button(&tr("Open"), &["suggested-action"]);
-        open_installed.set_valign(gtk::Align::Center);
-        open_installed.connect_clicked(input(|| Msg::OpenResolve));
-        let uninstall = button(&tr("Uninstall…"), &["destructive-action"]);
-        uninstall.set_valign(gtk::Align::Center);
-        uninstall.connect_clicked(input(|| Msg::AskUninstall));
-        installed_row.add_suffix(&uninstall);
-        installed_row.add_suffix(&open_installed);
-        installed_group.add(&installed_row);
+        let installed_group = adw::PreferencesGroup::builder()
+            .title(tr("Installed"))
+            .margin_bottom(12)
+            .build();
+        let extras_group = adw::PreferencesGroup::builder().margin_bottom(24).build();
         let restore_row = adw::ActionRow::builder()
             .subtitle(tr("Restore point saved before the last update"))
             .build();
@@ -435,7 +517,7 @@ impl Component for App {
         restore.set_valign(gtk::Align::Center);
         restore.connect_clicked(input(|| Msg::Restore));
         restore_row.add_suffix(&restore);
-        installed_group.add(&restore_row);
+        extras_group.add(&restore_row);
         let usb_row = adw::ActionRow::builder()
             .title(tr("Blackmagic USB devices"))
             .build();
@@ -444,7 +526,7 @@ impl Component for App {
         usb_button.set_valign(gtk::Align::Center);
         usb_button.connect_clicked(input(|| Msg::SetupUsb));
         usb_row.add_suffix(&usb_button);
-        installed_group.add(&usb_row);
+        extras_group.add(&usb_row);
         let recheck = button(&tr("Check again"), &["pill"]);
         recheck.connect_clicked(input(|| Msg::Recheck));
         let proceed = button(&tr("Continue"), &["suggested-action", "pill"]);
@@ -454,6 +536,7 @@ impl Component for App {
         let check_page = page_box(&[
             status.upcast_ref(),
             installed_group.upcast_ref(),
+            extras_group.upcast_ref(),
             check_group.upcast_ref(),
             button_row(&[&recheck, &proceed]).upcast_ref(),
             button_row(&[&report_check]).upcast_ref(),
@@ -609,19 +692,16 @@ impl Component for App {
         toolbar.set_content(Some(&toasts));
         root.set_content(Some(&toolbar));
 
-        if let Some(inst) = model.installed.clone() {
-            // Offline-first: a failed check just shows nothing.
-            sender.spawn_command(move |out| {
-                let info = remote::check_update(
-                    &remote::Http::new(),
-                    &Recipe::bundled(),
-                    inst.edition,
-                    Some(&inst.version),
-                );
-                let _ = out.send(Cmd::Update(info));
-            });
-        }
+        model.check_updates(&sender);
         sender.input(Msg::RunHealth);
+        sender.input(Msg::PollStatus);
+        gtk::glib::timeout_add_seconds_local(STATUS_POLL_SECS, {
+            let input = sender.input_sender().clone();
+            move || {
+                input.emit(Msg::PollStatus);
+                gtk::glib::ControlFlow::Continue
+            }
+        });
         sync_background_service();
         crate::desktop::force_window_buttons();
         if !std::path::Path::new("/.flatpak-info").exists() {
@@ -633,8 +713,9 @@ impl Component for App {
         }
         let mut widgets = Widgets {
             installed_group,
-            installed_row,
-            problem_rows: Vec::new(),
+            install_rows: Vec::new(),
+            install_sig: String::new(),
+            extras_group,
             restore_row,
             usb_row,
             usb_button,
@@ -720,7 +801,42 @@ impl Component for App {
                 }
             }
             Msg::StartInstall(file) => self.start_install(file, &sender),
-            Msg::AskUninstall => self.ask_uninstall(&sender, root),
+            Msg::AskUninstall(container) => self.ask_uninstall(container, &sender, root),
+            Msg::RemoveInstallation(container) => {
+                sender.spawn_command(move |out| {
+                    let runner = HostRunner::new();
+                    let home = state::home();
+                    let summary = rli_core::uninstall::remove_installation(
+                        &runner,
+                        &integrate::data_home(&home),
+                        &State::default_path(),
+                        &container,
+                    );
+                    let _ = out.send(Cmd::InstallationRemoved(container, summary));
+                });
+            }
+            Msg::Stop(container) => {
+                self.stopping.insert(container.clone());
+                sender.spawn_command(move |out| {
+                    let runner = HostRunner::new();
+                    let _ = runner.run(&stop_command(&container));
+                    let prefix = format!("{}-", Recipe::bundled().container.name_prefix);
+                    let _ = out.send(Cmd::Stopped(
+                        container,
+                        running_containers(&runner, &prefix),
+                    ));
+                });
+            }
+            Msg::PollStatus => {
+                if self.polling || self.installed.is_empty() || self.page != Page::Check {
+                    return;
+                }
+                self.polling = true;
+                sender.spawn_command(|out| {
+                    let prefix = format!("{}-", Recipe::bundled().container.name_prefix);
+                    let _ = out.send(Cmd::Status(running_containers(&HostRunner::new(), &prefix)));
+                });
+            }
             Msg::Preferences => {
                 let input = sender.input_sender().clone();
                 crate::preferences::present(root, &self.gpus, self.installed.clone(), move || {
@@ -733,17 +849,6 @@ impl Component for App {
                 crate::apply_log_setting(&settings());
                 apply_gpu_choice(&mut self.report, &self.gpus);
                 sync_background_service();
-            }
-            Msg::RemoveContainer(name) => {
-                sender.spawn_command(move |_| {
-                    let _ = HostRunner::new().run(&[
-                        "podman".into(),
-                        "rm".into(),
-                        "--force".into(),
-                        "--ignore".into(),
-                        name,
-                    ]);
-                });
             }
             Msg::Restore => {
                 let Some(gpu) = self.chosen_gpu().cloned() else {
@@ -785,7 +890,8 @@ impl Component for App {
                 });
             }
             Msg::SetupUsb => {
-                let Some(inst) = self.installed.clone() else {
+                // The rules are the same in both editions; Studio (listed last) needs them.
+                let Some(inst) = self.installed.last().cloned() else {
                     return;
                 };
                 sender.spawn_command(move |out| {
@@ -823,32 +929,66 @@ impl Component for App {
                 });
             }
             Msg::RunHealth => {
-                let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
+                let (installs, Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
                 else {
                     self.problems.clear();
                     return;
                 };
+                if installs.is_empty() {
+                    self.problems.clear();
+                    return;
+                }
+                let gpus = self.gpus.clone();
                 sender.spawn_command(move |out| {
                     let runner = HostRunner::new();
                     let home = state::home();
                     let recipe = Recipe::bundled();
-                    let tools = tools::detect(&runner, &recipe, &home);
-                    let problems = match tools.distrobox.executable() {
-                        Some(dbx) => health::check(
-                            &runner,
-                            &recipe,
-                            &dbx,
-                            &inst,
-                            Some(gpu.vendor),
-                            &integrate::data_home(&home),
-                        ),
-                        None => vec![Problem::ContainerMissing],
-                    };
+                    let data_home = integrate::data_home(&home);
+                    tidy_menu(&runner, &recipe, &home, &data_home);
+                    let dbx = tools::detect(&runner, &recipe, &home)
+                        .distrobox
+                        .executable();
+                    // The checks run inside the containers, which starts them; stop the
+                    // ones that were stopped again so the status icons stay truthful.
+                    let prefix = format!("{}-", recipe.container.name_prefix);
+                    let was_running = running_containers(&runner, &prefix);
+                    let mut problems = Vec::new();
+                    for inst in &installs {
+                        let found = match &dbx {
+                            Some(dbx) => {
+                                if integrate::has_legacy_entry(
+                                    &data_home,
+                                    inst.edition,
+                                    &inst.container,
+                                ) {
+                                    // Vinci 0.3 put a Studio entry under the Free id: move it.
+                                    let _ = flow::write_launcher(
+                                        &runner, &recipe, dbx, inst, &gpus, &gpu, &data_home,
+                                    );
+                                }
+                                health::check(
+                                    &runner,
+                                    &recipe,
+                                    dbx,
+                                    inst,
+                                    Some(gpu.vendor),
+                                    &data_home,
+                                )
+                            }
+                            None => vec![Problem::ContainerMissing],
+                        };
+                        problems.extend(found.into_iter().map(|p| (inst.container.clone(), p)));
+                        if !was_running.contains(&inst.container) {
+                            let _ = runner.run(&stop_command(&inst.container));
+                        }
+                    }
                     let _ = out.send(Cmd::Health(problems));
                 });
             }
-            Msg::Repair(Repair::Reinstall) => sender.input(Msg::Proceed),
-            Msg::Repair(Repair::UpdatePackages) => self.update_packages(&sender),
+            Msg::Repair(_, Repair::Reinstall) => sender.input(Msg::Proceed),
+            Msg::Repair(container, Repair::UpdatePackages) => {
+                self.update_packages(container, &sender)
+            }
             Msg::AskCancel => self.ask_cancel(&sender, root),
             Msg::CancelInstall => {
                 if let Some(c) = &self.progress.cancel {
@@ -860,10 +1000,14 @@ impl Component for App {
                     std::thread::spawn(move || c.cancel());
                 }
             }
-            Msg::Repair(Repair::Explain) => {}
-            Msg::Repair(Repair::RecreateLauncher) => {
-                let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned())
-                else {
+            Msg::Repair(_, Repair::Explain) => {}
+            Msg::Repair(container, Repair::RecreateLauncher) => {
+                let inst = self
+                    .installed
+                    .iter()
+                    .find(|i| i.container == container)
+                    .cloned();
+                let (Some(inst), Some(gpu)) = (inst, self.chosen_gpu().cloned()) else {
                     return;
                 };
                 let gpus = self.gpus.clone();
@@ -922,12 +1066,18 @@ impl Component for App {
                 )));
             }
             Msg::OpenResolve => {
-                let container = self
-                    .outcome
-                    .as_ref()
-                    .map(|o| o.installation.container.clone())
-                    .or_else(|| self.installed.as_ref().map(|i| i.container.clone()));
-                if let (Some(container), Some(g)) = (container, self.chosen_gpu()) {
+                if let Some(o) = &self.outcome {
+                    sender.input(Msg::Open(o.installation.container.clone()));
+                }
+                // From the "installed" page, go back to the overview of the installation
+                // (uninstall, restore, USB…) without restarting Vinci.
+                if self.page == Page::Done {
+                    self.page = Page::Check;
+                    sender.input(Msg::RunHealth);
+                }
+            }
+            Msg::Open(container) => {
+                if let Some(g) = self.chosen_gpu() {
                     let recipe = Recipe::bundled();
                     let runner = HostRunner::new();
                     let tools = tools::detect(&runner, &recipe, &state::home());
@@ -937,17 +1087,16 @@ impl Component for App {
                         let _ = runner.spawn_detached(&argv);
                     }
                 }
-                // From the "installed" page, go back to the overview of the installation
-                // (uninstall, restore, USB…) without restarting Vinci.
-                if self.page == Page::Done {
-                    self.page = Page::Check;
-                    sender.input(Msg::RunHealth);
-                }
+                // Show it as running soon after, without waiting for the next poll.
+                gtk::glib::timeout_add_seconds_local_once(2, {
+                    let input = sender.input_sender().clone();
+                    move || input.emit(Msg::PollStatus)
+                });
             }
         }
     }
 
-    fn update_cmd(&mut self, cmd: Cmd, sender: ComponentSender<Self>, root: &Self::Root) {
+    fn update_cmd(&mut self, cmd: Cmd, sender: ComponentSender<Self>, _root: &Self::Root) {
         match cmd {
             Cmd::Downloads(found) => {
                 self.installers = found;
@@ -989,8 +1138,19 @@ impl Component for App {
                 self.progress.step = tr("Recreating the container and trying again");
             }
             Cmd::Progress(Event::Finished { .. }) => {}
-            Cmd::Update(info) => self.update = Some(info),
+            Cmd::Update(edition, info) => {
+                self.updates.retain(|(e, _)| *e != edition);
+                self.updates.push((edition, info));
+            }
             Cmd::Health(problems) => self.problems = problems,
+            Cmd::Status(running) => {
+                self.polling = false;
+                self.running = running;
+            }
+            Cmd::Stopped(container, running) => {
+                self.stopping.remove(&container);
+                self.running = running;
+            }
             Cmd::UsbConfigured(Ok(_)) => {
                 self.usb_configured = true;
                 self.toasts.add_toast(adw::Toast::new(&tr(
@@ -1006,10 +1166,10 @@ impl Component for App {
             Cmd::Restored(result) => {
                 self.restoring = false;
                 match result {
-                    Ok(inst) => {
-                        self.installed = Some(inst);
+                    Ok(_) => {
+                        self.installed = installations();
                         self.backup = None;
-                        self.update = None;
+                        self.check_updates(&sender);
                         self.toasts
                             .add_toast(adw::Toast::new(&tr("The previous version is back.")));
                     }
@@ -1022,10 +1182,37 @@ impl Component for App {
                 }
                 sender.input(Msg::RunHealth);
             }
-            Cmd::Uninstalled(summary) => {
-                self.installed = None;
+            Cmd::InstallationRemoved(container, summary) => {
+                let name = self
+                    .installed
+                    .iter()
+                    .find(|i| i.container == container)
+                    .map(|i| format!("{} {}", messages::edition_name(i.edition), i.version))
+                    .unwrap_or(container);
+                self.installed = installations();
+                self.backup = State::load(&State::default_path())
+                    .ok()
+                    .and_then(|s| s.backup);
+                self.updates
+                    .retain(|(e, _)| self.installed.iter().any(|i| i.edition == *e));
                 self.outcome = None;
-                self.update = None;
+                let text = if summary.warnings.is_empty() {
+                    tr("{name} was removed.").replace("{name}", &name)
+                } else {
+                    format!(
+                        "{} {}",
+                        tr("Removed, with warnings:"),
+                        summary.warnings.join(", ")
+                    )
+                };
+                self.toasts.add_toast(adw::Toast::new(&text));
+                sender.input(Msg::RunHealth);
+            }
+            Cmd::Uninstalled(summary) => {
+                self.installed.clear();
+                self.outcome = None;
+                self.updates.clear();
+                self.problems.clear();
                 let text = if summary.warnings.is_empty() {
                     tr("DaVinci Resolve was uninstalled.")
                 } else {
@@ -1042,11 +1229,9 @@ impl Component for App {
                 self.backup = State::load(&State::default_path())
                     .ok()
                     .and_then(|s| s.backup);
-                if let Some(old) = &outcome.replaced {
-                    self.offer_removing(old.clone(), &sender, root);
-                }
-                self.installed = Some(outcome.installation.clone());
+                self.installed = installations();
                 self.outcome = Some(outcome);
+                self.check_updates(&sender);
                 self.page = Page::Done;
             }
             Cmd::Finished(Err(e)) => {
@@ -1085,9 +1270,7 @@ impl Component for App {
             Cmd::CancelCleaned(failed) => {
                 self.progress.running.store(false, Ordering::Relaxed);
                 self.page = Page::Check;
-                self.installed = State::load(&State::default_path())
-                    .ok()
-                    .and_then(|s| s.installation);
+                self.installed = installations();
                 self.backup = State::load(&State::default_path())
                     .ok()
                     .and_then(|s| s.backup);
@@ -1120,24 +1303,35 @@ impl Component for App {
 
     fn update_view(&self, w: &mut Widgets, _sender: ComponentSender<Self>) {
         w.stack.set_visible_child_name(self.page.name());
-        match &self.update {
-            Some(UpdateInfo {
-                latest: Some(v),
-                update_available: true,
-                latest_is_bad: None,
-            }) => {
+        let update = self
+            .updates
+            .iter()
+            .find(|(_, u)| u.update_available && u.latest.is_some());
+        match update {
+            Some((
+                edition,
+                UpdateInfo {
+                    latest: Some(v),
+                    latest_is_bad: None,
+                    ..
+                },
+            )) => {
                 w.banner.set_title(
-                    &tr("DaVinci Resolve {version} is available")
+                    &tr("{name} {version} is available")
+                        .replace("{name}", messages::edition_name(*edition))
                         .replace("{version}", &v.to_string()),
                 );
                 w.banner.set_button_label(Some(&tr("Update")));
                 w.banner.set_revealed(self.page == Page::Check);
             }
-            Some(UpdateInfo {
-                latest: Some(v),
-                update_available: true,
-                latest_is_bad: Some(bad),
-            }) => {
+            Some((
+                _,
+                UpdateInfo {
+                    latest: Some(v),
+                    latest_is_bad: Some(bad),
+                    ..
+                },
+            )) => {
                 w.banner.set_title(&format!(
                     "{} ({})",
                     tr("Version {version} has known problems. Keep your current version for now.")
@@ -1158,15 +1352,9 @@ impl Component for App {
             .chosen_gpu()
             .map_or_else(|| tr("no compatible GPU"), messages::gpu_label);
         w.status.set_description(Some(&format!("{distro} · {gpu}")));
-        w.installed_group.set_visible(self.installed.is_some());
-        if let Some(i) = &self.installed {
-            w.installed_row.set_title(&format!(
-                "{} {}",
-                messages::edition_name(i.edition),
-                i.version
-            ));
-            w.installed_row.set_subtitle(&tr("Installed"));
-        }
+        w.installed_group.set_visible(!self.installed.is_empty());
+        w.extras_group.set_visible(!self.installed.is_empty());
+        self.show_installs(w, &_sender);
         w.usb_row.set_subtitle(&if self.usb_configured {
             tr("Set up: Studio dongle, Speed Editor and panels")
         } else {
@@ -1181,33 +1369,6 @@ impl Component for App {
                 messages::edition_name(b.edition),
                 b.version
             ));
-        }
-        for row in w.problem_rows.drain(..) {
-            w.installed_group.remove(&row);
-        }
-        for p in &self.problems {
-            let (title, subtitle) = messages::problem(p);
-            let row = adw::ActionRow::builder()
-                .title(title)
-                .subtitle(subtitle)
-                .subtitle_lines(0)
-                .build();
-            row.add_prefix(&gtk::Image::from_icon_name("dialog-warning-symbolic"));
-            let repair = p.repair();
-            if repair != Repair::Explain {
-                let label = if repair == Repair::UpdatePackages {
-                    tr("Update")
-                } else {
-                    tr("Repair")
-                };
-                let b = button(&label, &[]);
-                b.set_valign(gtk::Align::Center);
-                let sender = _sender.clone();
-                b.connect_clicked(move |_| sender.input(Msg::Repair(repair)));
-                row.add_suffix(&b);
-            }
-            w.installed_group.add(&row);
-            w.problem_rows.push(row);
         }
         for row in w.check_rows.drain(..) {
             w.check_group.remove(&row);
@@ -1237,10 +1398,10 @@ impl Component for App {
             w.check_rows.push(row);
         }
         w.proceed.set_sensitive(!self.report.is_blocked());
-        w.proceed.set_label(&if self.installed.is_some() {
-            tr("Update or reinstall")
-        } else {
+        w.proceed.set_label(&if self.installed.is_empty() {
             tr("Continue")
+        } else {
+            tr("Install or update")
         });
 
         for row in w.source_rows.drain(..) {
@@ -1253,7 +1414,12 @@ impl Component for App {
                 .activatable(true)
                 .build();
             row.add_prefix(&gtk::Image::from_icon_name("package-x-generic-symbolic"));
-            let install = button(&tr("Install"), &["suggested-action"]);
+            let label = match self.installed.iter().find(|i| i.edition == f.edition) {
+                Some(i) if i.version == f.version => tr("Reinstall"),
+                Some(i) if i.version < f.version => tr("Update"),
+                _ => tr("Install"),
+            };
+            let install = button(&label, &["suggested-action"]);
             install.set_valign(gtk::Align::Center);
             let sender = _sender.clone();
             install.connect_clicked(move |_| sender.input(Msg::Install(i)));
@@ -1321,35 +1487,161 @@ impl App {
         })
     }
 
-    /// After switching edition (Free ↔ Studio), offers to remove the old container, ticked
-    /// by default (SPEC §7). Projects live in the home folder and are not affected.
-    fn offer_removing(
-        &self,
-        old: rli_core::state::Installation,
-        sender: &ComponentSender<Self>,
-        root: &adw::ApplicationWindow,
-    ) {
-        let dialog = adw::AlertDialog::new(
-            Some(&tr("Remove the previous installation?")),
-            Some(&tr("{name} is still installed in its own container. Removing it frees disk space; your projects are not affected.")
-                .replace("{name}", &format!("{} {}", messages::edition_name(old.edition), old.version))),
+    /// Asks Blackmagic for the latest version of every installed edition. Offline-first:
+    /// a failed check just shows nothing.
+    fn check_updates(&self, sender: &ComponentSender<Self>) {
+        for inst in self.installed.clone() {
+            sender.spawn_command(move |out| {
+                let info = remote::check_update(
+                    &remote::Http::new(),
+                    &Recipe::bundled(),
+                    inst.edition,
+                    Some(&inst.version),
+                );
+                let _ = out.send(Cmd::Update(inst.edition, info));
+            });
+        }
+    }
+
+    /// The rows of the "Installed" group: each install with its container status, open
+    /// and uninstall buttons, then the problems the self-check found in it.
+    fn show_installs(&self, w: &mut Widgets, sender: &ComponentSender<Self>) {
+        let update_for = |e: Edition| {
+            self.updates
+                .iter()
+                .find(|(ed, u)| *ed == e && u.update_available && u.latest_is_bad.is_none())
+                .and_then(|(_, u)| u.latest.clone())
+        };
+        let sig = format!(
+            "{:?}{:?}{:?}{:?}{:?}",
+            self.installed,
+            self.running,
+            self.stopping,
+            self.problems,
+            self.installed
+                .iter()
+                .map(|i| update_for(i.edition))
+                .collect::<Vec<_>>()
         );
-        dialog.add_response("keep", &tr("Keep"));
-        dialog.add_response("remove", &tr("Remove"));
-        dialog.set_response_appearance("remove", adw::ResponseAppearance::Destructive);
-        dialog.set_default_response(Some("remove"));
-        let sender = sender.clone();
-        dialog.connect_response(None, move |_, response| {
-            if response == "remove" {
-                sender.input(Msg::RemoveContainer(old.container.clone()));
+        if sig == w.install_sig {
+            return;
+        }
+        w.install_sig = sig;
+        for row in w.install_rows.drain(..) {
+            w.installed_group.remove(&row);
+        }
+        let several = self.installed.len() > 1;
+        for inst in &self.installed {
+            let name = messages::edition_name(inst.edition);
+            let running = self.running.contains(&inst.container);
+            let mut subtitle = if running {
+                tr("Container running")
+            } else {
+                tr("Container stopped")
+            };
+            if let Some(v) = update_for(inst.edition) {
+                subtitle.push_str(" · ");
+                subtitle.push_str(&tr("{version} available").replace("{version}", &v.to_string()));
             }
-        });
-        dialog.present(Some(root));
+            let row = adw::ActionRow::builder()
+                .title(format!("{name} {}", inst.version))
+                .subtitle(subtitle)
+                .build();
+            row.add_prefix(&status_icon(running));
+            let open = button(&tr("Open"), &["suggested-action"]);
+            open.set_valign(gtk::Align::Center);
+            let uninstall = button(&tr("Uninstall…"), &["destructive-action"]);
+            uninstall.set_valign(gtk::Align::Center);
+            for (b, msg) in [
+                (&open, Msg::Open as fn(String) -> Msg),
+                (&uninstall, Msg::AskUninstall),
+            ] {
+                let (sender, container) = (sender.clone(), inst.container.clone());
+                b.connect_clicked(move |_| sender.input(msg(container.clone())));
+            }
+            if running {
+                let stop = gtk::Button::from_icon_name("media-playback-stop-symbolic");
+                stop.set_valign(gtk::Align::Center);
+                stop.add_css_class("flat");
+                stop.set_tooltip_text(Some(&tr(
+                    "Stop the container to free memory (closes DaVinci Resolve)",
+                )));
+                stop.set_sensitive(!self.stopping.contains(&inst.container));
+                let (sender, container) = (sender.clone(), inst.container.clone());
+                stop.connect_clicked(move |_| sender.input(Msg::Stop(container.clone())));
+                row.add_suffix(&stop);
+            }
+            row.add_suffix(&uninstall);
+            row.add_suffix(&open);
+            w.installed_group.add(&row);
+            w.install_rows.push(row);
+
+            for (_, p) in self.problems.iter().filter(|(c, _)| *c == inst.container) {
+                let (title, subtitle) = messages::problem(p);
+                let title = if several {
+                    format!("{name}: {title}")
+                } else {
+                    title
+                };
+                let row = adw::ActionRow::builder()
+                    .title(title)
+                    .subtitle(subtitle)
+                    .subtitle_lines(0)
+                    .build();
+                row.add_prefix(&gtk::Image::from_icon_name("dialog-warning-symbolic"));
+                let repair = p.repair();
+                if repair != Repair::Explain {
+                    let label = if repair == Repair::UpdatePackages {
+                        tr("Update")
+                    } else {
+                        tr("Repair")
+                    };
+                    let b = button(&label, &[]);
+                    b.set_valign(gtk::Align::Center);
+                    let (sender, container) = (sender.clone(), inst.container.clone());
+                    b.connect_clicked(move |_| {
+                        sender.input(Msg::Repair(container.clone(), repair))
+                    });
+                    row.add_suffix(&b);
+                }
+                w.installed_group.add(&row);
+                w.install_rows.push(row);
+            }
+        }
     }
 
     /// Confirms the uninstall. Deleting projects is opt-in (unticked) per SPEC §7, and
     /// only tools Vinci itself installed are offered.
-    fn ask_uninstall(&self, sender: &ComponentSender<Self>, root: &adw::ApplicationWindow) {
+    fn ask_uninstall(
+        &self,
+        container: String,
+        sender: &ComponentSender<Self>,
+        root: &adw::ApplicationWindow,
+    ) {
+        let Some(inst) = self.installed.iter().find(|i| i.container == container) else {
+            return;
+        };
+        let name = format!("{} {}", messages::edition_name(inst.edition), inst.version);
+        if self.installed.len() > 1 {
+            // Others stay: only this container and its menu entry go. Projects, tools
+            // and settings are shared, so they are not offered here.
+            let dialog = adw::AlertDialog::new(
+                Some(&tr("Uninstall {name}?").replace("{name}", &name)),
+                Some(&tr("Its container and menu entry are removed. The other installation keeps working, and your projects stay: both editions share them.")),
+            );
+            dialog.add_response("cancel", &tr("Cancel"));
+            dialog.add_response("uninstall", &tr("Uninstall"));
+            dialog.set_response_appearance("uninstall", adw::ResponseAppearance::Destructive);
+            dialog.set_default_response(Some("cancel"));
+            let sender = sender.clone();
+            dialog.connect_response(None, move |_, response| {
+                if response == "uninstall" {
+                    sender.input(Msg::RemoveInstallation(container.clone()));
+                }
+            });
+            dialog.present(Some(root));
+            return;
+        }
         let recipe = Recipe::bundled();
         let runner = HostRunner::new();
         let st = State::load(&State::default_path()).unwrap_or_default();
@@ -1368,7 +1660,7 @@ impl App {
             })
             .collect();
         let dialog = adw::AlertDialog::new(
-            Some(&tr("Uninstall DaVinci Resolve?")),
+            Some(&tr("Uninstall {name}?").replace("{name}", &name)),
             Some(&tr("The container and menu entry are removed. Your projects stay unless you tick the option below.")),
         );
         dialog.set_extra_child(Some(&boxed));
@@ -1519,9 +1811,8 @@ impl App {
         let mut body = tr("Vinci will stop and remove what this installation created so far.");
         let recipe = Recipe::bundled();
         let replaces = self.progress.edition.is_some_and(|e| {
-            self.installed
-                .as_ref()
-                .is_some_and(|i| i.container == rli_core::container::container_name(&recipe, e))
+            let name = rli_core::container::container_name(&recipe, e);
+            self.installed.iter().any(|i| i.container == name)
         });
         if replaces && !settings().keep_restore_point {
             body.push_str("\n\n");
@@ -1555,8 +1846,13 @@ impl App {
 
     /// Brings the existing container up to the current recipe (new GPU driver, video
     /// drivers). Not cancellable: stopping apt halfway would leave it broken.
-    fn update_packages(&mut self, sender: &ComponentSender<Self>) {
-        let (Some(inst), Some(gpu)) = (self.installed.clone(), self.chosen_gpu().cloned()) else {
+    fn update_packages(&mut self, container: String, sender: &ComponentSender<Self>) {
+        let inst = self
+            .installed
+            .iter()
+            .find(|i| i.container == container)
+            .cloned();
+        let (Some(inst), Some(gpu)) = (inst, self.chosen_gpu().cloned()) else {
             return;
         };
         self.show_progress(sender);
@@ -1708,7 +2004,7 @@ fn install_blocking(
     };
     // apt prints thousands of lines; forward at most ~5 per second to keep the UI light.
     let mut last_line = std::time::Instant::now() - std::time::Duration::from_secs(1);
-    flow::install_resolve(&runner, &recipe, &req, &mut |e| {
+    let outcome = flow::install_resolve(&runner, &recipe, &req, &mut |e| {
         if let Event::Output(_) = &e {
             if last_line.elapsed() < std::time::Duration::from_millis(200) {
                 return;
@@ -1717,7 +2013,9 @@ fn install_blocking(
         }
         let _ = out.send(Cmd::Progress(e));
     })
-    .map_err(step_error)
+    .map_err(step_error)?;
+    tidy_menu(&HostRunner::new(), &recipe, &home, req.data_home);
+    Ok(outcome)
 }
 
 /// Summary and details (the last lines the failed command printed) for the error page.
@@ -1747,6 +2045,16 @@ mod tests {
             "Setting up libxcb1 (1.15) ..."
         );
         assert_eq!(clean_line("   "), "");
+    }
+
+    #[test]
+    fn only_vinci_containers_count_as_running() {
+        let running = ours("vinci-studio\nmy-arch-box\n  vinci-free \n\n", "vinci-");
+        assert_eq!(
+            running.into_iter().collect::<Vec<_>>(),
+            ["vinci-free", "vinci-studio"]
+        );
+        assert!(ours("", "vinci-").is_empty());
     }
 
     #[test]

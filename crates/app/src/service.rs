@@ -104,7 +104,12 @@ fn single_instance() -> Option<std::fs::File> {
 
 /// The container to convert in, plus the default import preset for this machine.
 fn engine() -> Option<(Engine, ImportPreset, Option<gpu::Gpu>)> {
-    let inst = State::load(&State::default_path()).ok()?.installation?;
+    // Free first: its import preset suits both editions.
+    let inst = State::load(&State::default_path())
+        .ok()?
+        .installations
+        .into_iter()
+        .next()?;
     let dbx = tools::detect(&HostRunner::new(), &Recipe::bundled(), &state::home())
         .distrobox
         .executable()?;

@@ -91,22 +91,59 @@ fn open_folder(dir: &Path, window: Option<&gtk::Window>) {
     );
 }
 
-/// A shell inside the Resolve container, in the user's terminal emulator.
-fn open_terminal(container: &str) -> Result<(), String> {
+/// A shell inside the Resolve container, in the user's terminal emulator. On failure,
+/// the reason and the command to type by hand.
+fn open_terminal(container: &str) -> Result<(), (String, String)> {
     let runner = HostRunner::new();
     let dbx = tools::detect(&runner, &Recipe::bundled(), &rli_core::state::home())
         .distrobox
-        .executable()
-        .ok_or_else(|| tr("distrobox is missing"))?;
+        .executable();
+    let manual = terminal::manual_command(dbx.as_deref().unwrap_or("distrobox"), container);
+    let fail = |reason: String| (reason, manual.clone());
+    let dbx = dbx.ok_or_else(|| fail(tr("distrobox is missing")))?;
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
-    let argv = terminal::find(&runner, &desktop, &terminal::shell_in(&dbx, container))
-        .ok_or_else(|| tr("No terminal app found on this computer."))?;
-    runner.spawn_detached(&argv).map_err(|e| e.to_string())
+    let on_error =
+        tr("The container's shell ended with an error (see above). Press Enter to close.");
+    let argv = terminal::find(
+        &runner,
+        &desktop,
+        &terminal::shell_in(&dbx, container, &on_error),
+    )
+    .ok_or_else(|| fail(tr("No terminal app found on this computer.")))?;
+    runner.spawn_detached(&argv).map_err(|e| {
+        rli_core::log::info(&format!("terminal did not start: {e}"));
+        fail(e.to_string())
+    })
+}
+
+/// When no terminal could be opened: the command to type in one, ready to copy.
+fn show_manual_terminal(parent: &adw::PreferencesDialog, reason: &str, command: String) {
+    let body = tr("{reason}\n\nOpen any terminal app and run this command to get a shell inside DaVinci Resolve's container:")
+        .replace("{reason}", reason);
+    let dialog = adw::AlertDialog::new(Some(&tr("Open the terminal yourself")), Some(&body));
+    let field = gtk::Entry::builder()
+        .text(&command)
+        .editable(false)
+        .css_classes(["monospace"])
+        .margin_top(6)
+        .build();
+    dialog.set_extra_child(Some(&field));
+    dialog.add_responses(&[("close", &tr("Close")), ("copy", &tr("Copy command"))]);
+    dialog.set_response_appearance("copy", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("copy"));
+    let parent_widget = parent.clone();
+    dialog.connect_response(None, move |_, response| {
+        if response == "copy" {
+            parent_widget.clipboard().set_text(&command);
+            parent_widget.add_toast(adw::Toast::new(&tr("Command copied")));
+        }
+    });
+    dialog.present(Some(parent));
 }
 
 /// Tools for advanced users: a shell in the container and the folder with Resolve's data.
 fn advanced_group(
-    installed: Option<Installation>,
+    installed: Vec<Installation>,
     dialog: &adw::PreferencesDialog,
     window: Option<gtk::Window>,
 ) -> adw::PreferencesGroup {
@@ -128,23 +165,37 @@ fn advanced_group(
         (row, b)
     };
 
-    let (term_row, term) = row_with_button(
-        tr("Open a terminal in the container"),
-        tr("A shell inside DaVinci Resolve's container, for troubleshooting or installing extra plugins. Use sudo for system changes."),
-        "utilities-terminal-symbolic",
-    );
-    term_row.set_sensitive(installed.is_some());
-    term.connect_clicked({
-        let (dialog, container) = (dialog.clone(), installed.map(|i| i.container));
-        move |_| {
-            if let Some(c) = &container {
-                if let Err(e) = open_terminal(c) {
-                    dialog.add_toast(adw::Toast::new(&e));
+    // One row per install; a single disabled one when nothing is installed yet.
+    let several = installed.len() > 1;
+    let targets: Vec<Option<Installation>> = if installed.is_empty() {
+        vec![None]
+    } else {
+        installed.into_iter().map(Some).collect()
+    };
+    for target in targets {
+        let title = match &target {
+            Some(i) if several => tr("Open a terminal in the {name} container")
+                .replace("{name}", crate::messages::edition_name(i.edition)),
+            _ => tr("Open a terminal in the container"),
+        };
+        let (term_row, term) = row_with_button(
+            title,
+            tr("A shell inside DaVinci Resolve's container, for troubleshooting or installing extra plugins. Use sudo for system changes."),
+            "utilities-terminal-symbolic",
+        );
+        term_row.set_sensitive(target.is_some());
+        term.connect_clicked({
+            let (dialog, container) = (dialog.clone(), target.map(|i| i.container));
+            move |_| {
+                if let Some(c) = &container {
+                    if let Err((reason, command)) = open_terminal(c) {
+                        show_manual_terminal(&dialog, &reason, command);
+                    }
                 }
             }
-        }
-    });
-    group.add(&term_row);
+        });
+        group.add(&term_row);
+    }
 
     let data = rli_core::uninstall::resolve_data_dir(&rli_core::state::home());
     let (folder_row, folder) = row_with_button(
@@ -163,7 +214,7 @@ fn advanced_group(
 pub fn present(
     parent: &impl IsA<gtk::Widget>,
     gpus: &[Gpu],
-    installed: Option<Installation>,
+    installed: Vec<Installation>,
     on_change: impl Fn() + 'static,
 ) {
     let store = Rc::new(RefCell::new(Settings::load(&Settings::default_path())));
