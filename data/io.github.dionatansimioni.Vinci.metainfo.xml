@@ -63,6 +63,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.6" date="2026-10-29">
+      <description>
+        <p>The first time the window is closed, Vinci asks whether to keep running in the tray, with a "Don't ask again" option.</p>
+      </description>
+    </release>
     <release version="0.4.5" date="2026-10-29">
       <description>
         <p>Closing the window keeps Vinci in the system tray, with an option to quit instead.</p>
