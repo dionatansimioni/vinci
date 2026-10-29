@@ -100,7 +100,16 @@ pub fn manual_command(distrobox: &str, container: &str) -> String {
 /// the window stays open with `on_error` and the exit code until Enter is pressed,
 /// instead of flashing and closing. `report` records whether the shell started and how
 /// it ended (see [`read_report`]): the terminal's own exit says nothing about it.
-pub fn shell_in(distrobox: &str, container: &str, on_error: &str, report: &Path) -> Vec<String> {
+///
+/// The shell is bash started with `rc` (see [`container_rc`]), so the prompt shows which
+/// container it is in.
+pub fn shell_in(
+    distrobox: &str,
+    container: &str,
+    on_error: &str,
+    report: &Path,
+    rc: &Path,
+) -> Vec<String> {
     argv(&[
         "sh",
         "-c",
@@ -118,7 +127,34 @@ if [ "$st" -ne 0 ] || [ "$secs" -lt 5 ]; then printf '\n%s (%s)\n' "$msg" "$st";
         "enter",
         "--name",
         container,
+        "--",
+        "bash",
+        "--rcfile",
+        &rc.to_string_lossy(),
+        "-i",
     ])
+}
+
+/// Where [`container_rc`] goes: in the home folder, which the container shares.
+pub fn rc_path(home: &Path) -> std::path::PathBuf {
+    home.join(".local/share/vinci/container.bashrc")
+}
+
+/// A bash startup file for the container terminal: the user's usual one, then the
+/// container's name in front of the prompt and `welcome` on the first line. The shell
+/// shares the home folder and `~/.bashrc` with the computer, so without it the two look
+/// the same.
+pub fn container_rc(container: &str, welcome: &str) -> String {
+    let quote = |s: &str| format!("'{}'", s.replace('\'', r"'\''"));
+    format!(
+        r#"[ -f /etc/bash.bashrc ] && . /etc/bash.bashrc
+[ -f ~/.bashrc ] && . ~/.bashrc
+printf '\033[1;36m%s\033[0m\n' {welcome}
+PS1="\[\033[1;36m\]⬢ "{container}"\[\033[0m\] $PS1"
+"#,
+        welcome = quote(welcome),
+        container = quote(container),
+    )
 }
 
 /// What the shell started by [`shell_in`] did, as far as its report file tells.
@@ -191,12 +227,23 @@ mod tests {
             "vinci-free",
             "Failed",
             Path::new("/r"),
+            Path::new("/rc"),
         );
         let konsole = command("konsole", &inner).unwrap();
         assert_eq!(konsole[..4], ["konsole", "--separate", "-e", "sh"]);
         assert_eq!(
-            konsole[konsole.len() - 4..],
-            ["/usr/bin/distrobox", "enter", "--name", "vinci-free"]
+            konsole[konsole.len() - 9..],
+            [
+                "/usr/bin/distrobox",
+                "enter",
+                "--name",
+                "vinci-free",
+                "--",
+                "bash",
+                "--rcfile",
+                "/rc",
+                "-i"
+            ]
         );
         assert_eq!(
             command("gnome-terminal", &inner).unwrap()[..2],
@@ -245,10 +292,22 @@ mod tests {
         };
         assert_eq!(read_report(&report), ShellRun::NeverStarted);
         // `false` stands in for a distrobox that fails; `true` for one that ends at once.
-        let fails = shell_in("false", "c", "It ended. Press Enter.", &report);
+        let fails = shell_in(
+            "false",
+            "c",
+            "It ended. Press Enter.",
+            &report,
+            Path::new("/rc"),
+        );
         assert_eq!(run(&fails, "\n"), "\nIt ended. Press Enter. (1)\n");
         assert_eq!(read_report(&report), ShellRun::Ended { code: 1, secs: 0 });
-        let quick = shell_in("true", "c", "It ended. Press Enter.", &report);
+        let quick = shell_in(
+            "true",
+            "c",
+            "It ended. Press Enter.",
+            &report,
+            Path::new("/rc"),
+        );
         assert_eq!(run(&quick, "\n"), "\nIt ended. Press Enter. (0)\n");
         assert_eq!(read_report(&report), ShellRun::Ended { code: 0, secs: 0 });
 
@@ -257,13 +316,47 @@ mod tests {
         let _ = std::fs::remove_file(&report);
     }
 
+    /// The prompt names the container and the first line says where the user is, after
+    /// their own bashrc has run (it would set its own prompt otherwise).
+    #[test]
+    fn marks_the_prompt_inside_the_container() {
+        let home = std::env::temp_dir().join(format!("rli-rc-{}", std::process::id()));
+        std::fs::create_dir_all(&home).unwrap();
+        std::fs::write(home.join(".bashrc"), "PS1='me@pc$ '\n").unwrap();
+        let rc = rc_path(&home);
+        std::fs::create_dir_all(rc.parent().unwrap()).unwrap();
+        std::fs::write(&rc, container_rc("vinci-free", "You're in Bob's container")).unwrap();
+        let out = std::process::Command::new("bash")
+            .args([
+                "--rcfile",
+                &rc.to_string_lossy(),
+                "-i",
+                "-c",
+                "echo \"$PS1\"",
+            ])
+            .env("HOME", &home)
+            .stderr(std::process::Stdio::null())
+            .output()
+            .unwrap();
+        let out = String::from_utf8(out.stdout).unwrap();
+        assert!(out.contains("You're in Bob's container"), "{out}");
+        assert!(out.contains("⬢ vinci-free\\[\\033[0m\\] me@pc$"), "{out}");
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
     #[test]
     fn finds_the_first_installed_terminal() {
         let r = FakeRunner::default().respond(&["sh", "-c"], "konsole\nxterm\n", true);
         let a = find(
             &r,
             "KDE",
-            &shell_in("distrobox", "vinci-free", "x", Path::new("/r")),
+            &shell_in(
+                "distrobox",
+                "vinci-free",
+                "x",
+                Path::new("/r"),
+                Path::new("/rc"),
+            ),
         )
         .unwrap();
         assert_eq!(a[..3], ["konsole", "--separate", "-e"]);

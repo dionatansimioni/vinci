@@ -110,10 +110,15 @@ fn open_terminal(container: &str, parent: &adw::PreferencesDialog) {
     let report = rli_core::log::dir().join("terminal.status");
     let _ = std::fs::create_dir_all(rli_core::log::dir());
     let _ = std::fs::remove_file(&report);
+    let rc = terminal::rc_path(&rli_core::state::home());
+    let welcome = tr("You are inside the {container} container. Type exit to leave.")
+        .replace("{container}", container);
+    let _ = std::fs::create_dir_all(rc.parent().unwrap_or(&rc))
+        .and_then(|()| std::fs::write(&rc, terminal::container_rc(container, &welcome)));
     let Some(argv) = terminal::find(
         &runner,
         &desktop,
-        &terminal::shell_in(&dbx, container, &on_error, &report),
+        &terminal::shell_in(&dbx, container, &on_error, &report, &rc),
     ) else {
         show_manual_terminal(
             parent,

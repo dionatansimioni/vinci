@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinci\n"
 "Report-Msgid-Bugs-To: https://github.com/dionatansimioni/vinci/issues\n"
-"POT-Creation-Date: 2026-10-29 17:44+0000\n"
+"POT-Creation-Date: 2026-10-29 18:02+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -147,7 +147,7 @@ msgstr ""
 msgid "Media"
 msgstr ""
 
-#: crates/app/src/app.rs:687 crates/app/src/preferences.rs:473
+#: crates/app/src/app.rs:687 crates/app/src/preferences.rs:478
 msgid "Preferences"
 msgstr ""
 
@@ -756,19 +756,23 @@ msgid ""
 "close."
 msgstr ""
 
-#: crates/app/src/preferences.rs:120
+#: crates/app/src/preferences.rs:114
+msgid "You are inside the {container} container. Type exit to leave."
+msgstr ""
+
+#: crates/app/src/preferences.rs:125
 msgid "No terminal app found on this computer."
 msgstr ""
 
-#: crates/app/src/preferences.rs:168
+#: crates/app/src/preferences.rs:173
 msgid "The terminal closed right away: {error}"
 msgstr ""
 
-#: crates/app/src/preferences.rs:170
+#: crates/app/src/preferences.rs:175
 msgid "The terminal closed right away."
 msgstr ""
 
-#: crates/app/src/preferences.rs:199
+#: crates/app/src/preferences.rs:204
 msgid ""
 "{reason}\n"
 "\n"
@@ -776,140 +780,140 @@ msgid ""
 "Resolve's container:"
 msgstr ""
 
-#: crates/app/src/preferences.rs:201
+#: crates/app/src/preferences.rs:206
 msgid "Open the terminal yourself"
 msgstr ""
 
-#: crates/app/src/preferences.rs:209
+#: crates/app/src/preferences.rs:214
 msgid "Close"
 msgstr ""
 
-#: crates/app/src/preferences.rs:209
+#: crates/app/src/preferences.rs:214
 msgid "Copy command"
 msgstr ""
 
-#: crates/app/src/preferences.rs:216
+#: crates/app/src/preferences.rs:221
 msgid "Command copied"
 msgstr ""
 
-#: crates/app/src/preferences.rs:229
+#: crates/app/src/preferences.rs:234
 msgid "Advanced"
 msgstr ""
 
-#: crates/app/src/preferences.rs:255
+#: crates/app/src/preferences.rs:260
 msgid "Open a terminal in the {name} container"
 msgstr ""
 
-#: crates/app/src/preferences.rs:257
+#: crates/app/src/preferences.rs:262
 msgid "Open a terminal in the container"
 msgstr ""
 
-#: crates/app/src/preferences.rs:261
+#: crates/app/src/preferences.rs:266
 msgid ""
 "A shell inside DaVinci Resolve's container, for troubleshooting or "
 "installing extra plugins. Use sudo for system changes."
 msgstr ""
 
-#: crates/app/src/preferences.rs:278
+#: crates/app/src/preferences.rs:283
 msgid "Open the installation folder"
 msgstr ""
 
-#: crates/app/src/preferences.rs:279
+#: crates/app/src/preferences.rs:284
 msgid ""
 "Projects, database, settings, LUTs and logs of DaVinci Resolve ({path}). The "
 "program itself is inside the container, in /opt/resolve: reach it with the "
 "terminal above."
 msgstr ""
 
-#: crates/app/src/preferences.rs:301
+#: crates/app/src/preferences.rs:306
 msgid "General"
 msgstr ""
 
-#: crates/app/src/preferences.rs:303
+#: crates/app/src/preferences.rs:308
 msgid "System language"
 msgstr ""
 
-#: crates/app/src/preferences.rs:313
+#: crates/app/src/preferences.rs:318
 msgid "Language"
 msgstr ""
 
-#: crates/app/src/preferences.rs:314
+#: crates/app/src/preferences.rs:319
 msgid "Takes effect the next time Vinci opens."
 msgstr ""
 
-#: crates/app/src/preferences.rs:331
+#: crates/app/src/preferences.rs:336
 msgid "Automatic"
 msgstr ""
 
-#: crates/app/src/preferences.rs:345
+#: crates/app/src/preferences.rs:350
 msgid "GPU for DaVinci Resolve"
 msgstr ""
 
-#: crates/app/src/preferences.rs:347
+#: crates/app/src/preferences.rs:352
 msgid "Applies to the menu entry the next time Vinci repairs or installs it."
 msgstr ""
 
-#: crates/app/src/preferences.rs:366
+#: crates/app/src/preferences.rs:371
 msgid "Updates and disk space"
 msgstr ""
 
-#: crates/app/src/preferences.rs:386
+#: crates/app/src/preferences.rs:391
 msgid "Keep a restore point"
 msgstr ""
 
-#: crates/app/src/preferences.rs:387
+#: crates/app/src/preferences.rs:392
 msgid ""
 "Saves the current version before each update so you can go back (5–10 GB)."
 msgstr ""
 
-#: crates/app/src/preferences.rs:392
+#: crates/app/src/preferences.rs:397
 msgid "Keep the installer"
 msgstr ""
 
-#: crates/app/src/preferences.rs:393
+#: crates/app/src/preferences.rs:398
 msgid "Allows reinstalling without downloading again (3–12 GB)."
 msgstr ""
 
-#: crates/app/src/preferences.rs:399
+#: crates/app/src/preferences.rs:404
 msgid "Watch folders"
 msgstr ""
 
-#: crates/app/src/preferences.rs:401
+#: crates/app/src/preferences.rs:406
 msgid "Files placed in these folders are converted automatically."
 msgstr ""
 
-#: crates/app/src/preferences.rs:405
+#: crates/app/src/preferences.rs:410
 msgid "Convert in the background"
 msgstr ""
 
-#: crates/app/src/preferences.rs:406
+#: crates/app/src/preferences.rs:411
 msgid "Keeps converting with Vinci closed, with an icon in the system tray."
 msgstr ""
 
-#: crates/app/src/preferences.rs:413
+#: crates/app/src/preferences.rs:418
 msgid "Import folder (convert for editing)"
 msgstr ""
 
-#: crates/app/src/preferences.rs:421
+#: crates/app/src/preferences.rs:426
 msgid "Export folder (convert renders to MP4)"
 msgstr ""
 
-#: crates/app/src/preferences.rs:429
+#: crates/app/src/preferences.rs:434
 msgid "Logs"
 msgstr ""
 
-#: crates/app/src/preferences.rs:431
+#: crates/app/src/preferences.rs:436
 msgid "Save activity logs"
 msgstr ""
 
-#: crates/app/src/preferences.rs:432
+#: crates/app/src/preferences.rs:437
 msgid ""
 "Off by default. Records the commands Vinci runs and what they print in a "
 "file on this computer, with your user name hidden. Nothing is sent anywhere; "
 "attach the file yourself when asking for help."
 msgstr ""
 
-#: crates/app/src/preferences.rs:439
+#: crates/app/src/preferences.rs:444
 msgid "Open the logs folder"
 msgstr ""
 
