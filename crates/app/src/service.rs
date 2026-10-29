@@ -19,6 +19,9 @@ const POLL: Duration = Duration::from_secs(10);
 
 struct Tray {
     status: String,
+    /// The app icon drawn at a few sizes. Sent as pixels: an AppImage's icon isn't in the
+    /// desktop's icon theme, and a tray that can't find the named icon shows nothing.
+    pixmaps: Vec<ksni::Icon>,
     paused: Arc<AtomicBool>,
     quit: Arc<AtomicBool>,
 }
@@ -31,7 +34,14 @@ impl ksni::Tray for Tray {
         "Vinci".into()
     }
     fn icon_name(&self) -> String {
-        crate::APP_ID.into()
+        if self.pixmaps.is_empty() {
+            crate::APP_ID.into()
+        } else {
+            String::new()
+        }
+    }
+    fn icon_pixmap(&self) -> Vec<ksni::Icon> {
+        self.pixmaps.clone()
     }
     fn tool_tip(&self) -> ksni::ToolTip {
         ksni::ToolTip {
@@ -81,6 +91,36 @@ impl ksni::Tray for Tray {
             .into(),
         ]
     }
+}
+
+const ICON_SVG: &[u8] = include_bytes!("../../../data/icons/io.github.dionatansimioni.Vinci.svg");
+
+/// The app icon as ARGB32 pixels (what StatusNotifierItem wants) at common tray sizes.
+/// Empty when the image loader can't read SVG; the tray then asks for it by name.
+fn icon_pixmaps() -> Vec<ksni::Icon> {
+    use relm4::gtk::{gdk_pixbuf::Pixbuf, gio, glib};
+    [16, 22, 24, 32, 48, 64]
+        .into_iter()
+        .filter_map(|size| {
+            let stream = gio::MemoryInputStream::from_bytes(&glib::Bytes::from_static(ICON_SVG));
+            let pb =
+                Pixbuf::from_stream_at_scale(&stream, size, size, true, gio::Cancellable::NONE)
+                    .ok()?
+                    .add_alpha(false, 0, 0, 0)
+                    .ok()?;
+            let (w, h, stride) = (pb.width(), pb.height(), pb.rowstride() as usize);
+            let bytes = pb.read_pixel_bytes();
+            let data = (0..h as usize)
+                .flat_map(|y| bytes[y * stride..][..w as usize * 4].as_chunks::<4>().0)
+                .flat_map(|&[r, g, b, a]| [a, r, g, b])
+                .collect();
+            Some(ksni::Icon {
+                width: w,
+                height: h,
+                data,
+            })
+        })
+        .collect()
 }
 
 fn notify(summary: &str, body: &str) {
@@ -134,16 +174,23 @@ pub fn run() -> i32 {
     };
     let paused = Arc::new(AtomicBool::new(false));
     let quit = Arc::new(AtomicBool::new(false));
-    // No StatusNotifierWatcher (stock GNOME): keep working with notifications only.
+    // At login this can start before the desktop's tray (Cinnamon's xapp-sn-watcher, KDE's
+    // kded): the icon then shows up as soon as the tray does. Stock GNOME never has one,
+    // and the service keeps working with notifications only.
     let tray = {
         use ksni::blocking::TrayMethods;
-        Tray {
+        let spawned = Tray {
             status: tr("Watching your folders"),
+            pixmaps: icon_pixmaps(),
             paused: paused.clone(),
             quit: quit.clone(),
         }
-        .spawn()
-        .ok()
+        .assume_sni_available(true)
+        .spawn();
+        if let Err(e) = &spawned {
+            rli_core::log::info(&format!("tray icon unavailable: {e}"));
+        }
+        spawned.ok()
     };
     let set_status = |s: String| {
         if let Some(t) = &tray {
@@ -226,4 +273,20 @@ pub fn run() -> i32 {
         t.shutdown().wait();
     }
     0
+}
+
+#[cfg(test)]
+mod tests {
+    /// The tray gets the icon as pixels it can always show, at every size, fully opaque
+    /// somewhere (not a blank square).
+    #[test]
+    fn draws_the_tray_icon() {
+        let icons = super::icon_pixmaps();
+        assert_eq!(icons.len(), 6, "the SVG loader is missing");
+        for i in &icons {
+            assert_eq!(i.data.len(), (i.width * i.height * 4) as usize);
+            assert!(i.data.as_chunks::<4>().0.iter().any(|px| px[0] == 255));
+        }
+        assert_eq!((icons[1].width, icons[1].height), (22, 22));
+    }
 }

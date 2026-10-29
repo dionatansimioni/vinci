@@ -264,7 +264,14 @@ fn sync_background_service() {
     let command = watch::service_command(in_flatpak, appimage.as_deref(), &exe);
     let _ = watch::sync_autostart(&s, &command, &watch::autostart_path());
     if s.background_service && (s.watch_import.is_some() || s.watch_export.is_some()) {
-        let _ = std::process::Command::new(&exe)
+        // From an AppImage, through the .AppImage file: our own copy of the binary lives
+        // in a mount that goes away when this window closes, taking the service with it.
+        let program = if in_flatpak {
+            exe.as_os_str()
+        } else {
+            command[0].as_ref()
+        };
+        let _ = rli_core::host::command(&program.to_string_lossy())
             .arg("--watch")
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
