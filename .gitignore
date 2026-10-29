@@ -8,3 +8,6 @@
 *.tmp
 # Signing keys must never be committed
 *.key
+# Local scratch files, never part of the project
+/tmp/
+/filebrowser.sqlite

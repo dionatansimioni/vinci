@@ -41,4 +41,5 @@
 ## Pendente
 
 1. **Testes que dependem de você/ambiente**: podman rootless com usuário comum; GNOME/KDE reais (bandeja, notificações, Wayland+XWayland, atalho no menu); AMD e Intel; Studio com chave e com dongle; build Flatpak.
-2. **Publicar no GitHub** — só quando você disser que está pronto.
+2. **Publicar no GitHub**: README em inglês e português, site em `site/` (GitHub Pages), release automático por tag e licenças de terceiros (`THIRD-PARTY.md`) prontos; falta criar o repositório e enviar.
+3. **Flathub**: ver [FLATHUB.md](FLATHUB.md).

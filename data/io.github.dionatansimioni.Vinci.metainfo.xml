@@ -36,9 +36,24 @@
     </p>
   </description>
   <launchable type="desktop-id">io.github.dionatansimioni.Vinci.desktop</launchable>
-  <url type="homepage">https://github.com/dionatansimioni/vinci</url>
+  <url type="homepage">https://dionatansimioni.github.io/vinci/</url>
   <url type="bugtracker">https://github.com/dionatansimioni/vinci/issues</url>
   <url type="vcs-browser">https://github.com/dionatansimioni/vinci</url>
+  <url type="contribute">https://github.com/dionatansimioni/vinci</url>
+  <screenshots>
+    <screenshot type="default">
+      <image>https://dionatansimioni.github.io/vinci/img/main-en.png</image>
+      <caption>System check and the installed DaVinci Resolve</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://dionatansimioni.github.io/vinci/img/media-en.png</image>
+      <caption>Converting media Resolve can't open on Linux</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://dionatansimioni.github.io/vinci/img/prefs-en.png</image>
+      <caption>Preferences with watch folders for background conversion</caption>
+    </screenshot>
+  </screenshots>
   <content_rating type="oars-1.1"/>
   <supports>
     <control>pointing</control>
