@@ -45,6 +45,64 @@ impl ExecMode {
     }
 }
 
+/// Variables the AppImage's GTK hook points at the files bundled inside it. Programs we
+/// start on the host must not see them: GNOME Terminal, Nemo and other GTK apps abort
+/// when GSETTINGS_SCHEMA_DIR hides their own settings schemas.
+const APPIMAGE_VARS: [&str; 12] = [
+    "GTK_DATA_PREFIX",
+    "GTK_THEME",
+    "GDK_BACKEND",
+    "GSETTINGS_SCHEMA_DIR",
+    "GI_TYPELIB_PATH",
+    "GTK_EXE_PREFIX",
+    "GTK_PATH",
+    "GDK_PIXBUF_MODULE_FILE",
+    "APPDIR",
+    "APPIMAGE",
+    "ARGV0",
+    "OWD",
+];
+
+/// How the environment of a program started on the host differs from ours: each
+/// variable to set (`Some`) or remove (`None`). Empty outside an AppImage.
+pub fn host_env_changes() -> Vec<(String, Option<String>)> {
+    env_changes(|k| std::env::var(k).ok())
+}
+
+fn env_changes(get: impl Fn(&str) -> Option<String>) -> Vec<(String, Option<String>)> {
+    let Some(appdir) = get("APPDIR").filter(|d| !d.is_empty()) else {
+        return Vec::new();
+    };
+    let mut out: Vec<(String, Option<String>)> = APPIMAGE_VARS
+        .iter()
+        .filter(|k| get(k).is_some())
+        .map(|k| (k.to_string(), None))
+        .collect();
+    if let Some(dirs) = get("XDG_DATA_DIRS") {
+        let kept: Vec<&str> = dirs
+            .split(':')
+            .filter(|d| !d.is_empty() && !d.starts_with(appdir.as_str()))
+            .collect();
+        out.push((
+            "XDG_DATA_DIRS".into(),
+            (!kept.is_empty()).then(|| kept.join(":")),
+        ));
+    }
+    out
+}
+
+/// A `Command` for a program on the host, with the AppImage's own variables taken out.
+pub fn command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    for (k, v) in host_env_changes() {
+        match v {
+            Some(v) => cmd.env(k, v),
+            None => cmd.env_remove(k),
+        };
+    }
+    cmd
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Output {
     pub success: bool,
@@ -128,7 +186,8 @@ impl HostRunner {
         let (program, args) = argv
             .split_first()
             .ok_or_else(|| std::io::Error::other("empty command"))?;
-        Command::new(program)
+        crate::log::command(&argv);
+        command(program)
             .args(args)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -173,7 +232,7 @@ fn exec_streaming(
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| std::io::Error::other("empty command"))?;
-    let mut cmd = Command::new(program);
+    let mut cmd = command(program);
     cmd.args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -236,7 +295,7 @@ fn exec(argv: &[String]) -> std::io::Result<Output> {
         .split_first()
         .ok_or_else(|| std::io::Error::other("empty command"))?;
     crate::log::command(argv);
-    let out = Command::new(program).args(args).output()?;
+    let out = command(program).args(args).output()?;
     crate::log::finished(out.status.code());
     if !out.status.success() {
         crate::log::output(&String::from_utf8_lossy(&out.stderr));
@@ -252,6 +311,42 @@ fn exec(argv: &[String]) -> std::io::Result<Output> {
 /// Builds an owned argv from string literals.
 pub fn argv(parts: &[&str]) -> Vec<String> {
     parts.iter().map(|s| s.to_string()).collect()
+}
+
+#[cfg(test)]
+mod env_tests {
+    use super::*;
+
+    #[test]
+    fn programs_on_the_host_do_not_see_the_appimage_environment() {
+        let env = |k: &str| -> Option<String> {
+            match k {
+                "APPDIR" => Some("/tmp/.mount_VinciX".into()),
+                "GSETTINGS_SCHEMA_DIR" => {
+                    Some("/tmp/.mount_VinciX//usr/share/glib-2.0/schemas".into())
+                }
+                "GTK_PATH" => Some("/tmp/.mount_VinciX//usr/lib/gtk-4.0".into()),
+                "XDG_DATA_DIRS" => Some(
+                    "/tmp/.mount_VinciX/usr/share:/usr/share:/usr/local/share:/usr/share".into(),
+                ),
+                _ => None,
+            }
+        };
+        let changes = env_changes(env);
+        let removed: Vec<&str> = changes
+            .iter()
+            .filter(|(_, v)| v.is_none())
+            .map(|(k, _)| k.as_str())
+            .collect();
+        assert_eq!(removed, ["GSETTINGS_SCHEMA_DIR", "GTK_PATH", "APPDIR"]);
+        assert!(changes.contains(&(
+            "XDG_DATA_DIRS".into(),
+            Some("/usr/share:/usr/local/share:/usr/share".into())
+        )));
+
+        // Outside an AppImage nothing changes, even with the same variables set.
+        assert!(env_changes(|k| (k != "APPDIR").then(|| "x".into())).is_empty());
+    }
 }
 
 #[cfg(test)]

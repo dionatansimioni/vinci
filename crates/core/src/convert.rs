@@ -6,7 +6,7 @@ use crate::gpu::Vendor;
 use std::collections::BTreeSet;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, SystemTime};
 
 /// Media we offer to convert. Lower-case extensions.
@@ -81,7 +81,7 @@ pub fn run_streaming(
     let (program, args) = argv
         .split_first()
         .ok_or_else(|| std::io::Error::other("empty command"))?;
-    let mut child = Command::new(program)
+    let mut child = crate::host::command(program)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -339,7 +339,7 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("rli-conv-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let src = dir.join("clip.mp4");
-        let made = Command::new("ffmpeg")
+        let made = std::process::Command::new("ffmpeg")
             .args([
                 "-hide_banner",
                 "-loglevel",
