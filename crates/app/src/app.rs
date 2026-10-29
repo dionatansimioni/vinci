@@ -252,8 +252,7 @@ fn apply_gpu_choice(report: &mut Report, gpus: &[Gpu]) {
     }
 }
 
-/// Makes the session autostart match the settings and starts the service right away
-/// when it should run (it refuses to start twice).
+/// Makes the session autostart match the settings and starts the service right away.
 fn sync_background_service() {
     use rli_core::watch;
     let s = settings();
@@ -263,7 +262,10 @@ fn sync_background_service() {
     // Inside the sandbox the app relaunches itself directly; autostart uses `flatpak run`.
     let command = watch::service_command(in_flatpak, appimage.as_deref(), &exe);
     let _ = watch::sync_autostart(&s, &command, &watch::autostart_path());
-    if s.background_service && (s.watch_import.is_some() || s.watch_export.is_some()) {
+    // Always: the service shows the tray icon while this window is open, and converts
+    // only when there are folders to watch. It refuses to start twice.
+    crate::service::hold_app_lock();
+    {
         // From an AppImage, through the .AppImage file: our own copy of the binary lives
         // in a mount that goes away when this window closes, taking the service with it.
         let program = if in_flatpak {

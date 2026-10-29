@@ -132,14 +132,51 @@ fn notify(summary: &str, body: &str) {
         .show();
 }
 
-/// Keeps a single service per user: the lock lives as long as the process.
-fn single_instance() -> Option<std::fs::File> {
+/// An exclusive lock on a file in the runtime dir, held as long as the file stays open.
+fn runtime_lock(name: &str) -> Option<std::fs::File> {
     let dir = std::env::var_os("XDG_RUNTIME_DIR")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(std::env::temp_dir);
-    let file = std::fs::File::create(dir.join("vinci-watch.lock")).ok()?;
+    let file = std::fs::File::create(dir.join(name)).ok()?;
     rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive).ok()?;
     Some(file)
+}
+
+/// Keeps a single service per user: the lock lives as long as the process.
+fn single_instance() -> Option<std::fs::File> {
+    runtime_lock("vinci-watch.lock")
+}
+
+static APP_LOCK: std::sync::OnceLock<Option<std::fs::File>> = std::sync::OnceLock::new();
+
+/// Marks the window as open for the service, which keeps the tray icon while it is.
+pub fn hold_app_lock() {
+    APP_LOCK.get_or_init(|| runtime_lock("vinci-app.lock"));
+}
+
+/// Whether a Vinci window is open: it holds the lock, so taking it fails.
+fn app_open() -> bool {
+    runtime_lock("vinci-app.lock").is_none()
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Mode {
+    /// Nothing to do and no window: the service (and its icon) goes away.
+    Stop,
+    /// Only the tray icon, while the window is open.
+    Idle,
+    Convert,
+}
+
+fn mode(settings: &Settings, app_open: bool) -> Mode {
+    let folders = settings.watch_import.is_some() || settings.watch_export.is_some();
+    if settings.background_service && folders {
+        Mode::Convert
+    } else if app_open {
+        Mode::Idle
+    } else {
+        Mode::Stop
+    }
 }
 
 /// The container to convert in, plus the default import preset for this machine.
@@ -204,10 +241,18 @@ pub fn run() -> i32 {
     let mut encoders: Option<(VideoCodec, Vec<Encoder>)> = None;
     while !quit.load(Ordering::Relaxed) {
         let settings = Settings::load(&Settings::default_path());
-        if !settings.background_service
-            || (settings.watch_import.is_none() && settings.watch_export.is_none())
-        {
-            break;
+        match mode(&settings, app_open()) {
+            Mode::Stop => break,
+            Mode::Idle => {
+                set_status(if settings.background_service {
+                    tr("No folder to watch: choose one in Preferences")
+                } else {
+                    tr("Background conversion is off")
+                });
+                std::thread::sleep(POLL);
+                continue;
+            }
+            Mode::Convert => {}
         }
         if paused.load(Ordering::Relaxed) {
             set_status(tr("Paused"));
@@ -277,6 +322,22 @@ pub fn run() -> i32 {
 
 #[cfg(test)]
 mod tests {
+    use super::{mode, Mode};
+    use rli_core::settings::Settings;
+
+    /// The icon stays while the window is open; conversions need folders and the switch.
+    #[test]
+    fn runs_while_the_window_is_open_or_there_is_work() {
+        let mut s = Settings::default();
+        assert_eq!(mode(&s, false), Mode::Stop);
+        assert_eq!(mode(&s, true), Mode::Idle);
+        s.watch_import = Some("/v".into());
+        assert_eq!(mode(&s, false), Mode::Convert);
+        s.background_service = false;
+        assert_eq!(mode(&s, false), Mode::Stop);
+        assert_eq!(mode(&s, true), Mode::Idle);
+    }
+
     /// The tray gets the icon as pixels it can always show, at every size, fully opaque
     /// somewhere (not a blank square).
     #[test]
