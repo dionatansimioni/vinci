@@ -48,6 +48,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.2" date="2026-10-29">
+      <description>
+        <p>The tray icon shows whenever Vinci is open, and the container terminal opens in its own Konsole window.</p>
+      </description>
+    </release>
     <release version="0.4.1" date="2026-10-29">
       <description>
         <p>Sound in DaVinci Resolve, the tray icon on KDE and Cinnamon, the container terminal opening in front of Vinci, and GPU decoding when converting media for import.</p>
