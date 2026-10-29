@@ -106,11 +106,14 @@ fn open_terminal(container: &str, parent: &adw::PreferencesDialog) {
     };
     let desktop = std::env::var("XDG_CURRENT_DESKTOP").unwrap_or_default();
     let on_error =
-        tr("The container's shell ended with an error (see above). Press Enter to close.");
+        tr("The container's shell has ended (exit code in parentheses). Press Enter to close.");
+    let report = rli_core::log::dir().join("terminal.status");
+    let _ = std::fs::create_dir_all(rli_core::log::dir());
+    let _ = std::fs::remove_file(&report);
     let Some(argv) = terminal::find(
         &runner,
         &desktop,
-        &terminal::shell_in(&dbx, container, &on_error),
+        &terminal::shell_in(&dbx, container, &on_error, &report),
     ) else {
         show_manual_terminal(
             parent,
@@ -139,16 +142,26 @@ fn open_terminal(container: &str, parent: &adw::PreferencesDialog) {
         let errors = std::fs::read_to_string(&err_path).unwrap_or_default();
         let _ = std::fs::remove_file(&err_path);
         let Ok(Ok(status)) = status else { return };
+        let elapsed = opened.elapsed();
+        let mut shell = terminal::read_report(&report);
+        if shell == terminal::ShellRun::NeverStarted && status.success() {
+            // A terminal server (GNOME Terminal) may run the command a moment after the
+            // launcher has exited.
+            gtk::glib::timeout_future_seconds(5).await;
+            shell = terminal::read_report(&report);
+        }
         rli_core::log::info(&format!(
-            "terminal ended ({status}) after {}s{}",
-            opened.elapsed().as_secs(),
+            "terminal ended ({status}) after {}s, shell: {shell:?}{}",
+            elapsed.as_secs(),
             if errors.trim().is_empty() {
                 String::new()
             } else {
                 format!(":\n{}", errors.trim_end())
             }
         ));
-        if !status.success() && opened.elapsed() < std::time::Duration::from_secs(5) {
+        // Without a report the command never ran: the user saw no shell at all.
+        let quick = !status.success() && elapsed < std::time::Duration::from_secs(5);
+        if quick || shell == terminal::ShellRun::NeverStarted {
             let last = errors.lines().rev().find(|l| !l.trim().is_empty());
             let reason = match last {
                 Some(l) => {

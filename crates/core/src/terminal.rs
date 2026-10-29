@@ -2,6 +2,7 @@
 //! debugging and installing extra plugins by hand.
 
 use crate::host::{argv, Runner};
+use std::path::Path;
 
 /// Terminals we know how to start with a command, and the flag that precedes it.
 /// An empty flag means the command follows the program name directly. Every one of them
@@ -95,21 +96,55 @@ pub fn manual_command(distrobox: &str, container: &str) -> String {
     format!("{program} enter --name {container}")
 }
 
-/// An interactive shell inside `container`. If it ends with an error (the container
-/// would not start, say), the window stays open with `on_error` until Enter is pressed,
-/// instead of flashing and closing.
-pub fn shell_in(distrobox: &str, container: &str, on_error: &str) -> Vec<String> {
+/// An interactive shell inside `container`. If it fails or ends within a few seconds,
+/// the window stays open with `on_error` and the exit code until Enter is pressed,
+/// instead of flashing and closing. `report` records whether the shell started and how
+/// it ended (see [`read_report`]): the terminal's own exit says nothing about it.
+pub fn shell_in(distrobox: &str, container: &str, on_error: &str, report: &Path) -> Vec<String> {
     argv(&[
         "sh",
         "-c",
-        r#"msg=$1; shift; "$@" || { printf '\n%s\n' "$msg"; read -r _; }"#,
+        r#"msg=$1; report=$2; shift 2
+echo started > "$report"
+t=$(date +%s)
+"$@"; st=$?
+secs=$(( $(date +%s) - t ))
+echo "ended $st $secs" > "$report"
+if [ "$st" -ne 0 ] || [ "$secs" -lt 5 ]; then printf '\n%s (%s)\n' "$msg" "$st"; read -r _; fi"#,
         "sh",
         on_error,
+        &report.to_string_lossy(),
         distrobox,
         "enter",
         "--name",
         container,
     ])
+}
+
+/// What the shell started by [`shell_in`] did, as far as its report file tells.
+#[derive(Debug, PartialEq, Eq)]
+pub enum ShellRun {
+    /// The terminal never ran the command (or it couldn't write the report).
+    NeverStarted,
+    /// Still running: in a window the terminal handed to another process, say.
+    Running,
+    Ended {
+        code: i32,
+        secs: u64,
+    },
+}
+
+pub fn read_report(path: &Path) -> ShellRun {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let mut words = text.split_whitespace();
+    match (words.next(), words.next(), words.next()) {
+        (Some("started"), ..) => ShellRun::Running,
+        (Some("ended"), Some(code), Some(secs)) => ShellRun::Ended {
+            code: code.parse().unwrap_or(-1),
+            secs: secs.parse().unwrap_or(0),
+        },
+        _ => ShellRun::NeverStarted,
+    }
 }
 
 /// The first installed terminal (checked on the host in one call), ready to run `inner`.
@@ -151,7 +186,12 @@ mod tests {
 
     #[test]
     fn builds_the_command_per_terminal() {
-        let inner = shell_in("/usr/bin/distrobox", "vinci-free", "Failed");
+        let inner = shell_in(
+            "/usr/bin/distrobox",
+            "vinci-free",
+            "Failed",
+            Path::new("/r"),
+        );
         let konsole = command("konsole", &inner).unwrap();
         assert_eq!(konsole[..4], ["konsole", "--separate", "-e", "sh"]);
         assert_eq!(
@@ -182,9 +222,11 @@ mod tests {
         );
     }
 
-    /// The wrapper runs the shell, and only on failure waits with the message.
+    /// The wrapper runs the shell, records how it went, and waits with the message when
+    /// it failed or ended at once (a window that only flashes tells nobody anything).
     #[test]
-    fn a_failing_shell_keeps_the_window_open_with_a_message() {
+    fn a_shell_that_fails_or_ends_at_once_keeps_the_window_open() {
+        let report = std::env::temp_dir().join(format!("rli-term-{}", std::process::id()));
         let run = |inner: &[String], input: &str| {
             use std::io::Write;
             let mut child = std::process::Command::new(&inner[0])
@@ -201,17 +243,29 @@ mod tests {
                 .unwrap();
             String::from_utf8(child.wait_with_output().unwrap().stdout).unwrap()
         };
-        // `false` stands in for a distrobox that fails; `true` for a clean exit.
-        let fails = shell_in("false", "c", "It failed. Press Enter.");
-        assert_eq!(run(&fails, "\n"), "\nIt failed. Press Enter.\n");
-        let works = shell_in("true", "c", "It failed. Press Enter.");
-        assert_eq!(run(&works, ""), "");
+        assert_eq!(read_report(&report), ShellRun::NeverStarted);
+        // `false` stands in for a distrobox that fails; `true` for one that ends at once.
+        let fails = shell_in("false", "c", "It ended. Press Enter.", &report);
+        assert_eq!(run(&fails, "\n"), "\nIt ended. Press Enter. (1)\n");
+        assert_eq!(read_report(&report), ShellRun::Ended { code: 1, secs: 0 });
+        let quick = shell_in("true", "c", "It ended. Press Enter.", &report);
+        assert_eq!(run(&quick, "\n"), "\nIt ended. Press Enter. (0)\n");
+        assert_eq!(read_report(&report), ShellRun::Ended { code: 0, secs: 0 });
+
+        std::fs::write(&report, "started\n").unwrap();
+        assert_eq!(read_report(&report), ShellRun::Running);
+        let _ = std::fs::remove_file(&report);
     }
 
     #[test]
     fn finds_the_first_installed_terminal() {
         let r = FakeRunner::default().respond(&["sh", "-c"], "konsole\nxterm\n", true);
-        let a = find(&r, "KDE", &shell_in("distrobox", "vinci-free", "x")).unwrap();
+        let a = find(
+            &r,
+            "KDE",
+            &shell_in("distrobox", "vinci-free", "x", Path::new("/r")),
+        )
+        .unwrap();
         assert_eq!(a[..3], ["konsole", "--separate", "-e"]);
         // Every candidate is passed as an argument, never spliced into the script.
         let call = &r.calls()[0];
