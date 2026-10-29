@@ -166,9 +166,35 @@ pub fn tray_available() -> bool {
     service_running && watcher
 }
 
-/// What closing the window does: hide it to the tray, or quit.
-pub fn hide_on_close(settings: &Settings, tray: bool) -> bool {
-    settings.close_to_tray && tray
+/// What closing the window does.
+#[derive(Debug, PartialEq, Eq)]
+pub enum OnClose {
+    Hide,
+    Quit,
+    /// Ask whether to keep Vinci in the tray (until the user says "don't ask again").
+    Ask,
+}
+
+pub fn on_close(settings: &Settings, tray: bool) -> OnClose {
+    if !tray {
+        // Hidden with no tray icon, Vinci could only be found again through the menu.
+        OnClose::Quit
+    } else if !settings.close_asked {
+        OnClose::Ask
+    } else if settings.close_to_tray {
+        OnClose::Hide
+    } else {
+        OnClose::Quit
+    }
+}
+
+/// Records the answer to the question; without "don't ask again" nothing changes and
+/// the question comes back next time.
+pub fn remember_close_answer(settings: &mut Settings, keep_in_tray: bool, dont_ask: bool) {
+    if dont_ask {
+        settings.close_to_tray = keep_in_tray;
+        settings.close_asked = true;
+    }
 }
 
 const ICON_SVG: &[u8] = include_bytes!("../../../data/icons/io.github.dionatansimioni.Vinci.svg");
@@ -400,7 +426,7 @@ pub fn run() -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{hide_on_close, mode, Mode};
+    use super::{mode, on_close, remember_close_answer, Mode, OnClose};
     use rli_core::settings::Settings;
 
     /// The icon stays while the window is open; conversions need folders and the switch.
@@ -416,18 +442,33 @@ mod tests {
         assert_eq!(mode(&s, true), Mode::Idle);
     }
 
-    /// Closing hides to the tray only when the user wants it and there is a tray.
+    /// Closing asks until the user says "don't ask again", then follows the answer;
+    /// with no tray it always quits.
     #[test]
-    fn closing_hides_to_the_tray_only_when_there_is_one() {
+    fn closing_asks_until_the_user_decides() {
         let mut s = Settings::default();
-        assert!(s.close_to_tray, "on by default");
-        assert!(hide_on_close(&s, true));
-        assert!(
-            !hide_on_close(&s, false),
-            "no tray: quitting is the only way out"
+        assert_eq!(on_close(&s, true), OnClose::Ask, "first close asks");
+        assert_eq!(
+            on_close(&s, false),
+            OnClose::Quit,
+            "no tray: no question, just quit"
         );
-        s.close_to_tray = false;
-        assert!(!hide_on_close(&s, true));
+
+        remember_close_answer(&mut s, false, false);
+        assert_eq!(
+            on_close(&s, true),
+            OnClose::Ask,
+            "without the box it asks again"
+        );
+
+        remember_close_answer(&mut s, true, true);
+        assert_eq!(on_close(&s, true), OnClose::Hide);
+        assert_eq!(on_close(&s, false), OnClose::Quit);
+
+        let mut s = Settings::default();
+        remember_close_answer(&mut s, false, true);
+        assert!(!s.close_to_tray);
+        assert_eq!(on_close(&s, true), OnClose::Quit);
     }
 
     /// The tray gets the icon as pixels it can always show, at every size, fully opaque

@@ -388,7 +388,11 @@ pub fn present(
         tr("Keep running in the tray when closed"),
         tr("Closing the window leaves Vinci in the system tray. Turn off to quit instead."),
         |s| s.close_to_tray,
-        |s, v| s.close_to_tray = v,
+        // Choosing here answers the question asked on the first close.
+        |s, v| {
+            s.close_to_tray = v;
+            s.close_asked = true;
+        },
     ));
 
     let safety = adw::PreferencesGroup::builder()

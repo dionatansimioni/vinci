@@ -26,6 +26,9 @@ pub struct Settings {
     pub save_logs: bool,
     /// Closing the window leaves Vinci in the system tray instead of quitting.
     pub close_to_tray: bool,
+    /// The user has answered "keep Vinci in the tray?" with "don't ask again" (or set
+    /// the option in Preferences), so closing no longer asks.
+    pub close_asked: bool,
 }
 
 impl Default for Settings {
@@ -40,6 +43,7 @@ impl Default for Settings {
             watch_export: None,
             save_logs: false,
             close_to_tray: true,
+            close_asked: false,
         }
     }
 }

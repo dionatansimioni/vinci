@@ -283,18 +283,20 @@ fn sync_background_service() {
 }
 
 /// Closing the window hides it while the tray icon stays (if the user wants that and the
-/// desktop has a tray). The tray's "Open Vinci" and the menu entry bring it back through
-/// GApplication's activation, and its "Quit Vinci" runs the `app.quit` action.
+/// desktop has a tray), asking the first time. The tray's "Open Vinci" and the menu entry
+/// bring it back through GApplication's activation, and its "Quit Vinci" runs the
+/// `app.quit` action.
 fn keep_in_tray(window: &adw::ApplicationWindow) {
+    use crate::service::OnClose;
+    use rli_core::settings::Settings;
     window.connect_close_request(|w| {
-        let settings =
-            rli_core::settings::Settings::load(&rli_core::settings::Settings::default_path());
-        if crate::service::hide_on_close(&settings, crate::service::tray_available()) {
-            w.set_visible(false);
-            gtk::glib::Propagation::Stop
-        } else {
-            gtk::glib::Propagation::Proceed
+        let settings = Settings::load(&Settings::default_path());
+        match crate::service::on_close(&settings, crate::service::tray_available()) {
+            OnClose::Quit => return gtk::glib::Propagation::Proceed,
+            OnClose::Hide => w.set_visible(false),
+            OnClose::Ask => ask_keep_in_tray(w),
         }
+        gtk::glib::Propagation::Stop
     });
     let app = relm4::main_application();
     app.connect_activate({
@@ -305,6 +307,44 @@ fn keep_in_tray(window: &adw::ApplicationWindow) {
         .activate(|app: &gtk::Application, _, _| app.quit())
         .build();
     app.add_action_entries([quit]);
+}
+
+/// "Keep Vinci in the tray?" with a "Don't ask again" box.
+fn ask_keep_in_tray(window: &adw::ApplicationWindow) {
+    use rli_core::settings::Settings;
+    let dont_ask = gtk::CheckButton::with_label(&tr("Don't ask again"));
+    dont_ask.set_halign(gtk::Align::Center);
+    let dialog = adw::AlertDialog::builder()
+        .heading(tr("Keep Vinci in the tray?"))
+        .body(tr("Vinci can keep running in the system tray, so watch folders keep converting and it opens again with one click."))
+        .extra_child(&dont_ask)
+        .default_response("tray")
+        .close_response("tray")
+        .build();
+    dialog.add_responses(&[("quit", &tr("Quit")), ("tray", &tr("Keep in tray"))]);
+    dialog.set_response_appearance("tray", adw::ResponseAppearance::Suggested);
+    let w = window.clone();
+    dialog.connect_response(None, move |_, response| {
+        let keep = response == "tray";
+        let path = Settings::default_path();
+        let mut settings = Settings::load(&path);
+        crate::service::remember_close_answer(&mut settings, keep, dont_ask.is_active());
+        let _ = settings.save(&path);
+        if keep {
+            w.set_visible(false);
+            return;
+        }
+        if dont_ask.is_active() {
+            let _ = notify_rust::Notification::new()
+                .appname("Vinci")
+                .icon(crate::APP_ID)
+                .summary(&tr("Vinci closed"))
+                .body(&tr("You can keep Vinci in the tray again in Preferences → General → Keep running in the tray when closed."))
+                .show();
+        }
+        relm4::main_application().quit();
+    });
+    dialog.present(Some(window));
 }
 
 /// A dot, green while the container runs and grey when it is stopped.
