@@ -48,6 +48,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.0" date="2026-10-29">
+      <description>
+        <p>Free and Studio installed side by side and managed from the home page, a status icon and stop button for each container, the Diolinux MPEG-4 conversion preset, only Resolve itself in the applications menu (Blackmagic's utility shortcuts are removed), and a terminal button that works on more desktops or shows the command to run.</p>
+      </description>
+    </release>
     <release version="0.3.0" date="2026-10-28">
       <description>
         <p>Cancel an installation and remove what it created, optional local activity log, newer Intel GPU drivers, hardware video drivers for AMD and Intel, automatic fallback to the CPU when a GPU encoder fails, and an update action for containers made by older versions.</p>

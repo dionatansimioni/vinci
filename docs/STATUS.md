@@ -1,4 +1,4 @@
-# Status (2026-10-28, versão 0.3.0)
+# Status (2026-10-29, versão 0.4.0)
 
 ## Pronto e testado
 
