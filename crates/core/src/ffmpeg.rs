@@ -17,6 +17,10 @@ pub enum ImportPreset {
     Prores422,
     /// Keep the video stream, only convert the audio to PCM (Studio on NVIDIA).
     AudioOnly,
+    /// Diolinux's WinFF preset (github.com/Diolinux/resolve-converter-winff-preset):
+    /// MPEG-4 Part 2 at the best quality + PCM audio in .mov, every audio track kept.
+    /// `short_side` resizes it (1080, 720); `None` keeps the original size.
+    Mpeg4 { short_side: Option<u16> },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -199,6 +203,7 @@ pub fn import_command(
     out_dir: &Path,
     preset: ImportPreset,
 ) -> (Vec<String>, PathBuf) {
+    let mut scale = Vec::new();
     let (suffix, body): (&str, &[&str]) = match preset {
         ImportPreset::DnxhrHq => (
             "dnxhr",
@@ -253,10 +258,42 @@ pub fn import_command(
                 "pcm_s16le",
             ],
         ),
+        ImportPreset::Mpeg4 { short_side } => {
+            // Same codec options as the WinFF preset. Two changes: only the main video
+            // plus every audio track are mapped (`-map 0` also took data tracks such as
+            // the iPhone's, which .mov can't hold), and the resize keeps the shape (the
+            // preset's fixed 1920x1080 stretched vertical phone videos).
+            if let Some(side) = short_side {
+                scale = args(&[
+                    "-vf",
+                    &format!("scale='if(gt(iw,ih),-2,{side})':'if(gt(iw,ih),{side},-2)'"),
+                ]);
+            }
+            (
+                match short_side {
+                    Some(1080) => "mpeg4_1080p",
+                    Some(720) => "mpeg4_720p",
+                    _ => "mpeg4",
+                },
+                &[
+                    "-map",
+                    "0:v:0",
+                    "-map",
+                    "0:a?",
+                    "-c:v",
+                    "mpeg4",
+                    "-q:v",
+                    "1",
+                    "-c:a",
+                    "pcm_s16le",
+                ],
+            )
+        }
     };
     let out = output_path(input, out_dir, suffix, "mov");
     let mut a = head(&[], input);
     a.extend(args(body));
+    a.extend(scale);
     a.push(out.to_string_lossy().into_owned());
     (a, out)
 }
@@ -451,6 +488,31 @@ mod tests {
             ImportPreset::Prores422,
         );
         assert!(has(&a, ["-c:v", "prores_ks"]));
+
+        let (a, out) = import_command(
+            Path::new("/v/c.mp4"),
+            Path::new("/o"),
+            ImportPreset::Mpeg4 { short_side: None },
+        );
+        assert_eq!(out, Path::new("/o/c_mpeg4.mov"));
+        assert!(has(&a, ["-c:v", "mpeg4"]) && has(&a, ["-q:v", "1"]));
+        assert!(
+            has(&a, ["-map", "0:a?"]),
+            "every audio track, as the preset"
+        );
+        assert!(!a.contains(&"-vf".to_string()));
+        let (a, out) = import_command(
+            Path::new("/v/c.mp4"),
+            Path::new("/o"),
+            ImportPreset::Mpeg4 {
+                short_side: Some(720),
+            },
+        );
+        assert_eq!(out, Path::new("/o/c_mpeg4_720p.mov"));
+        assert!(has(
+            &a,
+            ["-vf", "scale='if(gt(iw,ih),-2,720)':'if(gt(iw,ih),720,-2)'"]
+        ));
     }
 
     #[test]
@@ -564,6 +626,7 @@ mod tests {
             (ImportPreset::DnxhrHq, "dnxhd"),
             (ImportPreset::Prores422, "prores"),
             (ImportPreset::AudioOnly, "h264"),
+            (ImportPreset::Mpeg4 { short_side: None }, "mpeg4"),
         ] {
             let (argv, out) = import_command(&src, &dir, preset);
             run(&argv);
@@ -589,5 +652,61 @@ mod tests {
         );
         assert_eq!(probe(&out, "v:0"), "h264");
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    /// The Diolinux preset on a vertical phone clip with two audio tracks: the shape
+    /// stays vertical and both tracks survive. Needs ffmpeg; run with `--ignored`.
+    #[test]
+    #[ignore]
+    fn real_diolinux_preset_keeps_shape_and_tracks() {
+        use std::process::Command;
+        let dir = std::env::temp_dir().join(format!("rli-mpeg4-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let src = dir.join("vertical.mp4");
+        let lavfi = |spec: &str| ["-f".to_string(), "lavfi".into(), "-i".into(), spec.into()];
+        let ok = Command::new("ffmpeg")
+            .args(["-hide_banner", "-loglevel", "error"])
+            .args(lavfi("testsrc2=size=360x640:rate=30:duration=1"))
+            .args(lavfi("sine=frequency=440:duration=1"))
+            .args(lavfi("sine=frequency=880:duration=1"))
+            .args(["-map", "0", "-map", "1", "-map", "2", "-c:v", "libx264"])
+            .args(["-c:a", "aac", "-shortest"])
+            .arg(&src)
+            .status()
+            .unwrap()
+            .success();
+        assert!(ok, "could not create the source clip");
+        let (argv, out) = import_command(
+            &src,
+            &dir,
+            ImportPreset::Mpeg4 {
+                short_side: Some(720),
+            },
+        );
+        let run = Command::new(&argv[0]).args(&argv[1..]).output().unwrap();
+        assert!(
+            run.status.success(),
+            "{}",
+            String::from_utf8_lossy(&run.stderr)
+        );
+        let probe = Command::new("ffprobe")
+            .args([
+                "-v",
+                "error",
+                "-show_entries",
+                "stream=codec_name,width,height",
+            ])
+            .args(["-of", "csv=p=0"])
+            .arg(&out)
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&probe.stdout).into_owned();
+        std::fs::remove_dir_all(&dir).unwrap();
+        let lines: Vec<&str> = text.lines().collect();
+        assert_eq!(
+            lines,
+            ["mpeg4,720,1280", "pcm_s16le", "pcm_s16le"],
+            "{text}"
+        );
     }
 }

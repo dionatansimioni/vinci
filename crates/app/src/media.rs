@@ -22,9 +22,16 @@ pub enum Choice {
     Export(ExportPreset),
 }
 
-pub const CHOICES: [Choice; 5] = [
+pub const CHOICES: [Choice; 8] = [
     Choice::Import(ImportPreset::DnxhrHq),
     Choice::Import(ImportPreset::Prores422),
+    Choice::Import(ImportPreset::Mpeg4 { short_side: None }),
+    Choice::Import(ImportPreset::Mpeg4 {
+        short_side: Some(1080),
+    }),
+    Choice::Import(ImportPreset::Mpeg4 {
+        short_side: Some(720),
+    }),
     Choice::Import(ImportPreset::AudioOnly),
     Choice::Export(ExportPreset::Web),
     Choice::Export(ExportPreset::Archive),
@@ -38,6 +45,14 @@ pub fn choice_label(c: Choice) -> String {
         Choice::Import(ImportPreset::Prores422) => tr("For editing: ProRes 422 (large files)"),
         Choice::Import(ImportPreset::AudioOnly) => {
             tr("For editing: fix audio only (Studio with NVIDIA)")
+        }
+        Choice::Import(ImportPreset::Mpeg4 { short_side: None }) => {
+            tr("For editing: MPEG-4 (Diolinux preset)")
+        }
+        Choice::Import(ImportPreset::Mpeg4 {
+            short_side: Some(side),
+        }) => {
+            tr("For editing: MPEG-4 {size}p (Diolinux preset)").replace("{size}", &side.to_string())
         }
         Choice::Export(ExportPreset::Web) => tr("For publishing: MP4 H.264 (YouTube, web)"),
         Choice::Export(ExportPreset::Archive) => tr("For publishing: MP4 H.265 (smaller files)"),
@@ -59,6 +74,19 @@ pub fn size_note(c: Choice) -> (String, bool) {
             tr("The video is copied as is; only the audio becomes uncompressed, so files grow a little."),
             false,
         ),
+        // Measured: about 3.5 times an H.264 phone clip at the same size, a fraction of
+        // DNxHR HQ.
+        Choice::Import(ImportPreset::Mpeg4 { short_side }) => {
+            let mut note = tr("Diolinux's WinFF preset: MPEG-4 at the highest quality with uncompressed audio, keeping every audio track. Files get a few times bigger than phone videos, but much smaller than DNxHR and ProRes.");
+            if let Some(side) = short_side {
+                note.push(' ');
+                note.push_str(
+                    &tr("Resized to {size}p, lighter to edit on modest computers.")
+                        .replace("{size}", &side.to_string()),
+                );
+            }
+            (note, true)
+        }
         Choice::Export(ExportPreset::Web) => (
             tr("Much smaller than the render from Resolve, with high quality."),
             false,
@@ -124,7 +152,8 @@ pub struct MediaWidgets {
 /// The installed container and a distrobox to reach it, if Resolve is installed.
 fn engine() -> Option<(Engine, State)> {
     let st = State::load(&State::default_path()).ok()?;
-    let inst = st.installation.clone()?;
+    // Free first: its import preset suits both editions.
+    let inst = st.installations.first().cloned()?;
     let host = tools::detect(&HostRunner::new(), &Recipe::bundled(), &state::home());
     let distrobox = host.distrobox.executable()?;
     Some((
@@ -163,7 +192,7 @@ impl Component for Media {
     ) -> ComponentParts<Self> {
         let edition = State::load(&State::default_path())
             .ok()
-            .and_then(|s| s.installation)
+            .and_then(|s| s.installations.into_iter().next())
             .map(|i| i.edition);
         let default = edition.map_or(ImportPreset::DnxhrHq, |e| {
             ffmpeg::default_import(e, gpu.as_ref().map(|g| g.vendor))
@@ -493,7 +522,14 @@ mod tests {
             growing,
             [
                 Choice::Import(ImportPreset::DnxhrHq),
-                Choice::Import(ImportPreset::Prores422)
+                Choice::Import(ImportPreset::Prores422),
+                Choice::Import(ImportPreset::Mpeg4 { short_side: None }),
+                Choice::Import(ImportPreset::Mpeg4 {
+                    short_side: Some(1080)
+                }),
+                Choice::Import(ImportPreset::Mpeg4 {
+                    short_side: Some(720)
+                }),
             ]
         );
         for c in CHOICES {
