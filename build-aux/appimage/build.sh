@@ -5,7 +5,8 @@
 #   build-aux/appimage/build.sh            # needs podman (or ENGINE=docker)
 #
 # Output: build-aux/appimage/out/Vinci-<version>-x86_64.AppImage (+ .zsync for delta
-# updates). The version is the workspace one in Cargo.toml: bump it for every build you
+# updates, + .bundled-packages.txt listing the Ubuntu packages inside; SOURCES=1 also
+# writes .sources.tar with their source code, for releases). The version is the workspace one in Cargo.toml: bump it for every build you
 # hand out, so the newest file is always obvious. Older builds stay in out/.
 set -eu
 cd "$(dirname "$0")/../.."
@@ -50,9 +51,38 @@ chmod +x linuxdeploy linuxdeploy-plugin-gtk.sh
 export APPIMAGE_EXTRACT_AND_RUN=1 DEPLOY_GTK_VERSION=4
 export UPDATE_INFORMATION='gh-releases-zsync|dionatansimioni|vinci|latest|Vinci-*x86_64.AppImage.zsync'
 export LDAI_OUTPUT=$OUTPUT VERSION=$VERSION
-./linuxdeploy --appdir \$APPDIR --plugin gtk --output appimage \
-    --desktop-file \$APPDIR/usr/share/applications/io.github.dionatansimioni.Vinci.desktop \
-    --icon-file \$APPDIR/usr/share/icons/hicolor/scalable/apps/io.github.dionatansimioni.Vinci.svg
+deploy() {
+    ./linuxdeploy --appdir \$APPDIR --plugin gtk \"\$@\" \
+        --desktop-file \$APPDIR/usr/share/applications/io.github.dionatansimioni.Vinci.desktop \
+        --icon-file \$APPDIR/usr/share/icons/hicolor/scalable/apps/io.github.dionatansimioni.Vinci.svg
+}
+deploy
+# Licenses travel with the binaries: ours, the crates', and the copyright file of every
+# Ubuntu package whose libraries or icons were bundled (GTK, libadwaita, GLib... are LGPL).
+DOC=\$APPDIR/usr/share/doc/vinci
+install -Dm644 /src/LICENSE /src/THIRD-PARTY.md -t \$DOC
+find \$APPDIR/usr/lib -name '*.so*' -type f -printf '%f\\n' | while read -r lib; do
+    dpkg -S \"*/\$lib\" 2>/dev/null | cut -d: -f1 | head -1
+done > /tmp/pkgs
+dpkg -S /usr/share/icons/Adwaita/index.theme | cut -d: -f1 >> /tmp/pkgs
+install -d \$DOC/packages
+sort -u /tmp/pkgs | while read -r pkg; do
+    dpkg-query -W -f='\${Package} \${Version} (source: \${source:Package} \${source:Version})\\n' \$pkg
+    cp /usr/share/doc/\$pkg/copyright \$DOC/packages/\$pkg.copyright 2>/dev/null || true
+done > \$DOC/bundled-packages.txt
+cp \$DOC/bundled-packages.txt /tmp/bundled-packages.txt
+deploy --output appimage
 mkdir -p /src/build-aux/appimage/out
 mv $OUTPUT* /src/build-aux/appimage/out/
+cp /tmp/bundled-packages.txt /src/build-aux/appimage/out/$OUTPUT.bundled-packages.txt
+# The exact Ubuntu sources of everything bundled, published next to each release
+# (the LGPL asks for the library sources to be available alongside the binaries).
+if [ '${SOURCES:-0}' = 1 ]; then
+    sed -i 's/^Types: deb\$/Types: deb deb-src/' /etc/apt/sources.list.d/ubuntu.sources
+    apt-get update -qq
+    mkdir -p /tmp/sources && cd /tmp/sources
+    sed -n 's/.*(source: \\([^ ]*\\) \\([^)]*\\)).*/\\1=\\2/p' /tmp/bundled-packages.txt | sort -u |
+        xargs apt-get source --download-only -qq
+    cd /tmp && tar -cf /src/build-aux/appimage/out/$OUTPUT.sources.tar sources
+fi
 "

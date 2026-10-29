@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinci\n"
 "Report-Msgid-Bugs-To: https://github.com/dionatansimioni/vinci/issues\n"
-"POT-Creation-Date: 2026-10-29 18:02+0000\n"
+"POT-Creation-Date: 2026-10-29 18:25+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -17,21 +17,32 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
-#: crates/app/src/about.rs:20
+#: crates/app/src/about.rs:21
 msgid ""
 "Installs and runs DaVinci Resolve on any Linux distribution, in an isolated "
 "container, and converts media Resolve can't open on Linux."
 msgstr ""
 
-#: crates/app/src/about.rs:30
+#: crates/app/src/about.rs:31
 msgid "Unofficial"
 msgstr ""
 
-#: crates/app/src/about.rs:33
+#: crates/app/src/about.rs:34
 msgid ""
 "Vinci is an independent project, not affiliated with Blackmagic Design. "
 "DaVinci Resolve is a trademark of Blackmagic Design Pty. Ltd. and is "
 "downloaded from its website under its own license."
+msgstr ""
+
+#: crates/app/src/about.rs:39
+msgid "Third-party software"
+msgstr ""
+
+#: crates/app/src/about.rs:42
+msgid ""
+"Vinci uses GTK, libadwaita and other free software. The licenses of every "
+"component, and where to get their source code, are listed at <a href=\"{url}"
+"\">THIRD-PARTY.md</a>."
 msgstr ""
 
 #: crates/app/src/app.rs:78 crates/app/src/messages.rs:95

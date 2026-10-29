@@ -21,6 +21,8 @@ jobs:
       - run: cargo fmt --all --check
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
+      - name: Third-party license list is up to date
+        run: scripts/third-party.sh --check
 
   # Builds the real container from the recipe and runs the ffmpeg end-to-end test inside it.
   container:
