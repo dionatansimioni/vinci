@@ -6,7 +6,7 @@
 # Bump `revision` on every change; bump `schema` only when the format changes.
 
 schema = 1
-revision = 5
+revision = 6
 
 [container]
 image = "docker.io/library/ubuntu:24.04"
@@ -67,6 +67,10 @@ base = [
     "libnspr4",
     "libxkbfile1",
     "libgles2",
+    # Resolve plays sound through ALSA. This routes ALSA's default device to the host's
+    # PipeWire (its socket is in XDG_RUNTIME_DIR, which distrobox shares); without it
+    # ALSA finds the sound card taken by the host and Resolve is silent.
+    "pipewire-alsa",
 ]
 
 [gpu.nvidia]
