@@ -302,6 +302,23 @@ pub fn present(
     let on_change = Rc::new(on_change);
     let window = parent.root().and_downcast::<gtk::Window>();
 
+    let switch = |title: String,
+                  subtitle: String,
+                  get: fn(&Settings) -> bool,
+                  set: fn(&mut Settings, bool)| {
+        let row = adw::SwitchRow::builder()
+            .title(title)
+            .subtitle(subtitle)
+            .active(get(&store.borrow()))
+            .build();
+        let (store, on_change) = (store.clone(), on_change.clone());
+        row.connect_active_notify(move |r| {
+            set(&mut store.borrow_mut(), r.is_active());
+            save(&store.borrow());
+            on_change();
+        });
+        row
+    };
     let general = adw::PreferencesGroup::builder()
         .title(tr("General"))
         .build();
@@ -367,26 +384,16 @@ pub fn present(
         general.add(&row);
     }
 
+    general.add(&switch(
+        tr("Keep running in the tray when closed"),
+        tr("Closing the window leaves Vinci in the system tray. Turn off to quit instead."),
+        |s| s.close_to_tray,
+        |s, v| s.close_to_tray = v,
+    ));
+
     let safety = adw::PreferencesGroup::builder()
         .title(tr("Updates and disk space"))
         .build();
-    let switch = |title: String,
-                  subtitle: String,
-                  get: fn(&Settings) -> bool,
-                  set: fn(&mut Settings, bool)| {
-        let row = adw::SwitchRow::builder()
-            .title(title)
-            .subtitle(subtitle)
-            .active(get(&store.borrow()))
-            .build();
-        let (store, on_change) = (store.clone(), on_change.clone());
-        row.connect_active_notify(move |r| {
-            set(&mut store.borrow_mut(), r.is_active());
-            save(&store.borrow());
-            on_change();
-        });
-        row
-    };
     safety.add(&switch(
         tr("Keep a restore point"),
         tr("Saves the current version before each update so you can go back (5–10 GB)."),

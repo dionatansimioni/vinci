@@ -24,6 +24,8 @@ pub struct Settings {
     pub watch_export: Option<PathBuf>,
     /// Keep a local activity log (`log::default_path`). Off unless the user turns it on.
     pub save_logs: bool,
+    /// Closing the window leaves Vinci in the system tray instead of quitting.
+    pub close_to_tray: bool,
 }
 
 impl Default for Settings {
@@ -37,6 +39,7 @@ impl Default for Settings {
             watch_import: None,
             watch_export: None,
             save_logs: false,
+            close_to_tray: true,
         }
     }
 }

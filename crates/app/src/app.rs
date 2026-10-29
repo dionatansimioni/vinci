@@ -282,6 +282,31 @@ fn sync_background_service() {
     }
 }
 
+/// Closing the window hides it while the tray icon stays (if the user wants that and the
+/// desktop has a tray). The tray's "Open Vinci" and the menu entry bring it back through
+/// GApplication's activation, and its "Quit Vinci" runs the `app.quit` action.
+fn keep_in_tray(window: &adw::ApplicationWindow) {
+    window.connect_close_request(|w| {
+        let settings =
+            rli_core::settings::Settings::load(&rli_core::settings::Settings::default_path());
+        if crate::service::hide_on_close(&settings, crate::service::tray_available()) {
+            w.set_visible(false);
+            gtk::glib::Propagation::Stop
+        } else {
+            gtk::glib::Propagation::Proceed
+        }
+    });
+    let app = relm4::main_application();
+    app.connect_activate({
+        let window = window.clone();
+        move |_| window.present()
+    });
+    let quit = gio::ActionEntry::builder("quit")
+        .activate(|app: &gtk::Application, _, _| app.quit())
+        .build();
+    app.add_action_entries([quit]);
+}
+
 /// A dot, green while the container runs and grey when it is stopped.
 fn status_icon(running: bool) -> gtk::Image {
     let icon = gtk::Image::from_icon_name("media-record-symbolic");
@@ -712,6 +737,7 @@ impl Component for App {
             }
         });
         sync_background_service();
+        keep_in_tray(&root);
         crate::desktop::force_window_buttons();
         if !std::path::Path::new("/.flatpak-info").exists() {
             let appimage = std::env::var("APPIMAGE").ok();

@@ -3,6 +3,7 @@
 //! AppIndicator extension) and notifications either way (SPEC §9).
 
 use crate::i18n::tr;
+use relm4::gtk::{gio, glib, prelude::*};
 use rli_core::convert::{self, Engine};
 use rli_core::ffmpeg::{self, Encoder, ImportPreset, VideoCodec};
 use rli_core::host::HostRunner;
@@ -40,6 +41,9 @@ impl ksni::Tray for Tray {
             String::new()
         }
     }
+    fn activate(&mut self, _x: i32, _y: i32) {
+        open_window();
+    }
     fn icon_pixmap(&self) -> Vec<ksni::Icon> {
         self.pixmaps.clone()
     }
@@ -63,11 +67,7 @@ impl ksni::Tray for Tray {
             ksni::MenuItem::Separator,
             StandardItem {
                 label: tr("Open Vinci"),
-                activate: Box::new(|_| {
-                    if let Ok(exe) = std::env::current_exe() {
-                        let _ = std::process::Command::new(exe).spawn();
-                    }
-                }),
+                activate: Box::new(|_| open_window()),
                 ..Default::default()
             }
             .into(),
@@ -84,13 +84,91 @@ impl ksni::Tray for Tray {
             }
             .into(),
             StandardItem {
-                label: tr("Quit background service"),
-                activate: Box::new(|t: &mut Self| t.quit.store(true, Ordering::Relaxed)),
+                label: tr("Quit Vinci"),
+                activate: Box::new(|t: &mut Self| {
+                    // The window may be hidden in the tray: it goes too.
+                    app_action(
+                        "org.gtk.Actions",
+                        "Activate",
+                        (
+                            "quit",
+                            Vec::<glib::Variant>::new(),
+                            glib::VariantDict::new(None).end(),
+                        )
+                            .to_variant(),
+                    );
+                    t.quit.store(true, Ordering::Relaxed);
+                }),
                 ..Default::default()
             }
             .into(),
         ]
     }
+}
+
+const APP_PATH: &str = "/io/github/dionatansimioni/Vinci";
+
+/// Calls `method` on the running Vinci window's D-Bus interface (GApplication exports
+/// it). False when no window process is running.
+fn app_action(interface: &str, method: &str, args: glib::Variant) -> bool {
+    gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE)
+        .and_then(|bus| {
+            bus.call_sync(
+                Some(crate::APP_ID),
+                APP_PATH,
+                interface,
+                method,
+                Some(&args),
+                None,
+                gio::DBusCallFlags::NO_AUTO_START,
+                5000,
+                gio::Cancellable::NONE,
+            )
+        })
+        .is_ok()
+}
+
+/// Shows the window: the one hidden in the tray if Vinci is running, else a new one.
+fn open_window() {
+    let shown = app_action(
+        "org.freedesktop.Application",
+        "Activate",
+        (glib::VariantDict::new(None).end(),).to_variant(),
+    );
+    if !shown {
+        if let Ok(exe) = std::env::current_exe() {
+            let _ = std::process::Command::new(exe).spawn();
+        }
+    }
+}
+
+/// Whether closing the window can leave Vinci in the tray: this service is running and
+/// the desktop has a tray to show its icon (stock GNOME doesn't).
+pub fn tray_available() -> bool {
+    let service_running = single_instance().is_none();
+    let watcher = gio::bus_get_sync(gio::BusType::Session, gio::Cancellable::NONE)
+        .and_then(|bus| {
+            bus.call_sync(
+                Some("org.freedesktop.DBus"),
+                "/org/freedesktop/DBus",
+                "org.freedesktop.DBus",
+                "NameHasOwner",
+                Some(&("org.kde.StatusNotifierWatcher",).to_variant()),
+                Some(glib::VariantTy::new("(b)").unwrap()),
+                gio::DBusCallFlags::NONE,
+                2000,
+                gio::Cancellable::NONE,
+            )
+        })
+        .ok()
+        .and_then(|v| v.get::<(bool,)>())
+        .is_some_and(|(b,)| b);
+    service_running && watcher
+}
+
+/// What closing the window does: hide it to the tray, or quit.
+pub fn hide_on_close(settings: &Settings, tray: bool) -> bool {
+    settings.close_to_tray && tray
 }
 
 const ICON_SVG: &[u8] = include_bytes!("../../../data/icons/io.github.dionatansimioni.Vinci.svg");
@@ -322,7 +400,7 @@ pub fn run() -> i32 {
 
 #[cfg(test)]
 mod tests {
-    use super::{mode, Mode};
+    use super::{hide_on_close, mode, Mode};
     use rli_core::settings::Settings;
 
     /// The icon stays while the window is open; conversions need folders and the switch.
@@ -336,6 +414,20 @@ mod tests {
         s.background_service = false;
         assert_eq!(mode(&s, false), Mode::Stop);
         assert_eq!(mode(&s, true), Mode::Idle);
+    }
+
+    /// Closing hides to the tray only when the user wants it and there is a tray.
+    #[test]
+    fn closing_hides_to_the_tray_only_when_there_is_one() {
+        let mut s = Settings::default();
+        assert!(s.close_to_tray, "on by default");
+        assert!(hide_on_close(&s, true));
+        assert!(
+            !hide_on_close(&s, false),
+            "no tray: quitting is the only way out"
+        );
+        s.close_to_tray = false;
+        assert!(!hide_on_close(&s, true));
     }
 
     /// The tray gets the icon as pixels it can always show, at every size, fully opaque

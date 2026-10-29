@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: vinci\n"
 "Report-Msgid-Bugs-To: https://github.com/dionatansimioni/vinci/issues\n"
-"POT-Creation-Date: 2026-10-29 18:25+0000\n"
+"POT-Creation-Date: 2026-10-29 19:09+0000\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -49,372 +49,372 @@ msgstr ""
 msgid "Installing DaVinci Resolve"
 msgstr ""
 
-#: crates/app/src/app.rs:290 crates/app/src/app.rs:1547
+#: crates/app/src/app.rs:315 crates/app/src/app.rs:1573
 msgid "Container running"
 msgstr ""
 
-#: crates/app/src/app.rs:292 crates/app/src/app.rs:1549
+#: crates/app/src/app.rs:317 crates/app/src/app.rs:1575
 msgid "Container stopped"
 msgstr ""
 
-#: crates/app/src/app.rs:513
+#: crates/app/src/app.rs:538
 msgid "System check"
 msgstr ""
 
-#: crates/app/src/app.rs:517
+#: crates/app/src/app.rs:542
 msgid "Installed"
 msgstr ""
 
-#: crates/app/src/app.rs:522
+#: crates/app/src/app.rs:547
 msgid "Restore point saved before the last update"
 msgstr ""
 
-#: crates/app/src/app.rs:525
+#: crates/app/src/app.rs:550
 msgid "Go back to this version"
 msgstr ""
 
-#: crates/app/src/app.rs:531
+#: crates/app/src/app.rs:556
 msgid "Blackmagic USB devices"
 msgstr ""
 
-#: crates/app/src/app.rs:534
+#: crates/app/src/app.rs:559
 msgid "Set up"
 msgstr ""
 
-#: crates/app/src/app.rs:539
+#: crates/app/src/app.rs:564
 msgid "Check again"
 msgstr ""
 
-#: crates/app/src/app.rs:541 crates/app/src/app.rs:1411
+#: crates/app/src/app.rs:566 crates/app/src/app.rs:1437
 msgid "Continue"
 msgstr ""
 
-#: crates/app/src/app.rs:543 crates/app/src/app.rs:645
+#: crates/app/src/app.rs:568 crates/app/src/app.rs:670
 msgid "Copy diagnostic report"
 msgstr ""
 
-#: crates/app/src/app.rs:557 crates/app/src/app.rs:782
+#: crates/app/src/app.rs:582 crates/app/src/app.rs:808
 msgid "Choose the installer"
 msgstr ""
 
-#: crates/app/src/app.rs:558
+#: crates/app/src/app.rs:583
 msgid ""
 "Download DaVinci Resolve for Linux from Blackmagic Design's website. Vinci "
 "finds the file in your Downloads folder automatically."
 msgstr ""
 
-#: crates/app/src/app.rs:566
+#: crates/app/src/app.rs:591
 msgid "Open download page"
 msgstr ""
 
-#: crates/app/src/app.rs:568
+#: crates/app/src/app.rs:593
 msgid "Choose file…"
 msgstr ""
 
-#: crates/app/src/app.rs:570
+#: crates/app/src/app.rs:595
 msgid "Back"
 msgstr ""
 
-#: crates/app/src/app.rs:606
+#: crates/app/src/app.rs:631
 msgid "This takes a few minutes. You can keep using your computer."
 msgstr ""
 
-#: crates/app/src/app.rs:609 crates/app/src/app.rs:1641
-#: crates/app/src/app.rs:1676 crates/app/src/app.rs:1731
+#: crates/app/src/app.rs:634 crates/app/src/app.rs:1667
+#: crates/app/src/app.rs:1702 crates/app/src/app.rs:1757
 msgid "Cancel"
 msgstr ""
 
-#: crates/app/src/app.rs:623
+#: crates/app/src/app.rs:648
 msgid "DaVinci Resolve is installed"
 msgstr ""
 
-#: crates/app/src/app.rs:625
+#: crates/app/src/app.rs:650
 msgid ""
 "It is in your applications menu. Your projects stay in your home folder."
 msgstr ""
 
-#: crates/app/src/app.rs:628
+#: crates/app/src/app.rs:653
 msgid "Open DaVinci Resolve"
 msgstr ""
 
-#: crates/app/src/app.rs:635
+#: crates/app/src/app.rs:660
 msgid "Installation failed"
 msgstr ""
 
-#: crates/app/src/app.rs:643
+#: crates/app/src/app.rs:668
 msgid "Try again"
 msgstr ""
 
-#: crates/app/src/app.rs:662 crates/app/src/app.rs:1333
-#: crates/app/src/app.rs:1428 crates/app/src/app.rs:1604
+#: crates/app/src/app.rs:687 crates/app/src/app.rs:1359
+#: crates/app/src/app.rs:1454 crates/app/src/app.rs:1630
 msgid "Update"
 msgstr ""
 
-#: crates/app/src/app.rs:668
+#: crates/app/src/app.rs:693
 msgid "Installation"
 msgstr ""
 
-#: crates/app/src/app.rs:670
+#: crates/app/src/app.rs:695
 msgid "Media"
 msgstr ""
 
-#: crates/app/src/app.rs:687 crates/app/src/preferences.rs:478
+#: crates/app/src/app.rs:712 crates/app/src/preferences.rs:485
 msgid "Preferences"
 msgstr ""
 
-#: crates/app/src/app.rs:688
+#: crates/app/src/app.rs:713
 msgid "About Vinci"
 msgstr ""
 
-#: crates/app/src/app.rs:692
+#: crates/app/src/app.rs:717
 msgid "Main menu"
 msgstr ""
 
-#: crates/app/src/app.rs:778
+#: crates/app/src/app.rs:804
 msgid "DaVinci Resolve installer"
 msgstr ""
 
-#: crates/app/src/app.rs:876 crates/app/src/app.rs:914
-#: crates/app/src/app.rs:1877 crates/app/src/app.rs:2001
+#: crates/app/src/app.rs:902 crates/app/src/app.rs:940
+#: crates/app/src/app.rs:1903 crates/app/src/app.rs:2027
 #: crates/app/src/preferences.rs:104
 msgid "distrobox is missing"
 msgstr ""
 
-#: crates/app/src/app.rs:1005
+#: crates/app/src/app.rs:1031
 msgid "Cancelling and removing what was created…"
 msgstr ""
 
-#: crates/app/src/app.rs:1074
+#: crates/app/src/app.rs:1100
 msgid "Diagnostic report copied. Paste it in your issue or message."
 msgstr ""
 
-#: crates/app/src/app.rs:1124
+#: crates/app/src/app.rs:1150
 msgid "Type your password in the window that opened"
 msgstr ""
 
-#: crates/app/src/app.rs:1144
+#: crates/app/src/app.rs:1170
 msgid "Trying mirror"
 msgstr ""
 
-#: crates/app/src/app.rs:1147
+#: crates/app/src/app.rs:1173
 msgid "Recreating the container and trying again"
 msgstr ""
 
-#: crates/app/src/app.rs:1166
+#: crates/app/src/app.rs:1192
 msgid ""
 "USB devices set up. Reconnect the dongle or panel if it was already plugged "
 "in."
 msgstr ""
 
-#: crates/app/src/app.rs:1172
+#: crates/app/src/app.rs:1198
 msgid "Could not set up USB devices:"
 msgstr ""
 
-#: crates/app/src/app.rs:1183
+#: crates/app/src/app.rs:1209
 msgid "The previous version is back."
 msgstr ""
 
-#: crates/app/src/app.rs:1188
+#: crates/app/src/app.rs:1214
 msgid "Could not restore:"
 msgstr ""
 
-#: crates/app/src/app.rs:1209
+#: crates/app/src/app.rs:1235
 msgid "{name} was removed."
 msgstr ""
 
-#: crates/app/src/app.rs:1213
+#: crates/app/src/app.rs:1239
 msgid "Removed, with warnings:"
 msgstr ""
 
-#: crates/app/src/app.rs:1226
+#: crates/app/src/app.rs:1252
 msgid "DaVinci Resolve was uninstalled."
 msgstr ""
 
-#: crates/app/src/app.rs:1230
+#: crates/app/src/app.rs:1256
 msgid "Uninstalled, with warnings:"
 msgstr ""
 
-#: crates/app/src/app.rs:1287
+#: crates/app/src/app.rs:1313
 msgid "Installation cancelled. What it had created was removed."
 msgstr ""
 
-#: crates/app/src/app.rs:1291
+#: crates/app/src/app.rs:1317
 msgid "Installation cancelled. Could not remove:"
 msgstr ""
 
-#: crates/app/src/app.rs:1302
+#: crates/app/src/app.rs:1328
 msgid "The Resolve container is up to date."
 msgstr ""
 
-#: crates/app/src/app.rs:1329
+#: crates/app/src/app.rs:1355
 msgid "{name} {version} is available"
 msgstr ""
 
-#: crates/app/src/app.rs:1346
+#: crates/app/src/app.rs:1372
 msgid ""
 "Version {version} has known problems. Keep your current version for now."
 msgstr ""
 
-#: crates/app/src/app.rs:1359
+#: crates/app/src/app.rs:1385
 msgid "Unknown distribution"
 msgstr ""
 
-#: crates/app/src/app.rs:1362
+#: crates/app/src/app.rs:1388
 msgid "no compatible GPU"
 msgstr ""
 
-#: crates/app/src/app.rs:1368
+#: crates/app/src/app.rs:1394
 msgid "Set up: Studio dongle, Speed Editor and panels"
 msgstr ""
 
-#: crates/app/src/app.rs:1370
+#: crates/app/src/app.rs:1396
 msgid ""
 "Needed for the Studio USB dongle, Speed Editor and panels (asks for your "
 "password)"
 msgstr ""
 
-#: crates/app/src/app.rs:1387
+#: crates/app/src/app.rs:1413
 msgid "Everything looks good"
 msgstr ""
 
-#: crates/app/src/app.rs:1389
+#: crates/app/src/app.rs:1415
 msgid "This computer meets the requirements for DaVinci Resolve."
 msgstr ""
 
-#: crates/app/src/app.rs:1413
+#: crates/app/src/app.rs:1439
 msgid "Install or update"
 msgstr ""
 
-#: crates/app/src/app.rs:1427
+#: crates/app/src/app.rs:1453
 msgid "Reinstall"
 msgstr ""
 
-#: crates/app/src/app.rs:1429 crates/app/src/app.rs:1732
+#: crates/app/src/app.rs:1455 crates/app/src/app.rs:1758
 msgid "Install"
 msgstr ""
 
-#: crates/app/src/app.rs:1440
+#: crates/app/src/app.rs:1466
 msgid "Waiting for the download to finish in your Downloads folder…"
 msgstr ""
 
-#: crates/app/src/app.rs:1442
+#: crates/app/src/app.rs:1468
 msgid "No installer found in your Downloads folder yet."
 msgstr ""
 
-#: crates/app/src/app.rs:1456
+#: crates/app/src/app.rs:1482
 msgid "about {minutes} min left"
 msgstr ""
 
-#: crates/app/src/app.rs:1458
+#: crates/app/src/app.rs:1484
 msgid "less than 2 min left"
 msgstr ""
 
-#: crates/app/src/app.rs:1459
+#: crates/app/src/app.rs:1485
 msgid "taking longer than usual, still working…"
 msgstr ""
 
-#: crates/app/src/app.rs:1553
+#: crates/app/src/app.rs:1579
 msgid "{version} available"
 msgstr ""
 
-#: crates/app/src/app.rs:1560
+#: crates/app/src/app.rs:1586
 msgid "Open"
 msgstr ""
 
-#: crates/app/src/app.rs:1562
+#: crates/app/src/app.rs:1588
 msgid "Uninstall…"
 msgstr ""
 
-#: crates/app/src/app.rs:1576
+#: crates/app/src/app.rs:1602
 msgid "Stop the container to free memory (closes DaVinci Resolve)"
 msgstr ""
 
-#: crates/app/src/app.rs:1606
+#: crates/app/src/app.rs:1632
 msgid "Repair"
 msgstr ""
 
-#: crates/app/src/app.rs:1638 crates/app/src/app.rs:1672
+#: crates/app/src/app.rs:1664 crates/app/src/app.rs:1698
 msgid "Uninstall {name}?"
 msgstr ""
 
-#: crates/app/src/app.rs:1639
+#: crates/app/src/app.rs:1665
 msgid ""
 "Its container and menu entry are removed. The other installation keeps "
 "working, and your projects stay: both editions share them."
 msgstr ""
 
-#: crates/app/src/app.rs:1642 crates/app/src/app.rs:1677
+#: crates/app/src/app.rs:1668 crates/app/src/app.rs:1703
 msgid "Uninstall"
 msgstr ""
 
-#: crates/app/src/app.rs:1661
+#: crates/app/src/app.rs:1687
 msgid "Also delete projects and the Resolve database"
 msgstr ""
 
-#: crates/app/src/app.rs:1666
+#: crates/app/src/app.rs:1692
 msgid "Also remove"
 msgstr ""
 
-#: crates/app/src/app.rs:1673
+#: crates/app/src/app.rs:1699
 msgid ""
 "The container and menu entry are removed. Your projects stay unless you tick "
 "the option below."
 msgstr ""
 
-#: crates/app/src/app.rs:1716
+#: crates/app/src/app.rs:1742
 msgid "Podman is required"
 msgstr ""
 
-#: crates/app/src/app.rs:1717
+#: crates/app/src/app.rs:1743
 msgid ""
 "Install podman with your distribution's package manager, then open Vinci "
 "again."
 msgstr ""
 
-#: crates/app/src/app.rs:1724
+#: crates/app/src/app.rs:1750
 msgid "Vinci needs to install some tools"
 msgstr ""
 
-#: crates/app/src/app.rs:1727
+#: crates/app/src/app.rs:1753
 msgid "These tools run DaVinci Resolve in an isolated container:"
 msgstr ""
 
-#: crates/app/src/app.rs:1782
+#: crates/app/src/app.rs:1808
 msgid "Preparing"
 msgstr ""
 
-#: crates/app/src/app.rs:1820
+#: crates/app/src/app.rs:1846
 msgid "Vinci will stop and remove what this installation created so far."
 msgstr ""
 
-#: crates/app/src/app.rs:1828
+#: crates/app/src/app.rs:1854
 msgid ""
 "Restore points are off, so the version you had installed will need to be "
 "installed again."
 msgstr ""
 
-#: crates/app/src/app.rs:1838
+#: crates/app/src/app.rs:1864
 msgid ""
 "Podman, installed a moment ago, will be removed too (asks for your password)."
 msgstr ""
 
-#: crates/app/src/app.rs:1841
+#: crates/app/src/app.rs:1867
 msgid "Cancel the installation?"
 msgstr ""
 
-#: crates/app/src/app.rs:1842
+#: crates/app/src/app.rs:1868
 msgid "Keep installing"
 msgstr ""
 
-#: crates/app/src/app.rs:1843
+#: crates/app/src/app.rs:1869
 msgid "Cancel installation"
 msgstr ""
 
-#: crates/app/src/app.rs:1868
+#: crates/app/src/app.rs:1894
 msgid "Updating the Resolve container"
 msgstr ""
 
-#: crates/app/src/app.rs:1967
+#: crates/app/src/app.rs:1993
 msgid "Could not install"
 msgstr ""
 
@@ -836,99 +836,108 @@ msgid ""
 "terminal above."
 msgstr ""
 
-#: crates/app/src/preferences.rs:306
+#: crates/app/src/preferences.rs:323
 msgid "General"
 msgstr ""
 
-#: crates/app/src/preferences.rs:308
+#: crates/app/src/preferences.rs:325
 msgid "System language"
 msgstr ""
 
-#: crates/app/src/preferences.rs:318
+#: crates/app/src/preferences.rs:335
 msgid "Language"
 msgstr ""
 
-#: crates/app/src/preferences.rs:319
+#: crates/app/src/preferences.rs:336
 msgid "Takes effect the next time Vinci opens."
 msgstr ""
 
-#: crates/app/src/preferences.rs:336
+#: crates/app/src/preferences.rs:353
 msgid "Automatic"
 msgstr ""
 
-#: crates/app/src/preferences.rs:350
+#: crates/app/src/preferences.rs:367
 msgid "GPU for DaVinci Resolve"
 msgstr ""
 
-#: crates/app/src/preferences.rs:352
+#: crates/app/src/preferences.rs:369
 msgid "Applies to the menu entry the next time Vinci repairs or installs it."
 msgstr ""
 
-#: crates/app/src/preferences.rs:371
+#: crates/app/src/preferences.rs:388
+msgid "Keep running in the tray when closed"
+msgstr ""
+
+#: crates/app/src/preferences.rs:389
+msgid ""
+"Closing the window leaves Vinci in the system tray. Turn off to quit instead."
+msgstr ""
+
+#: crates/app/src/preferences.rs:395
 msgid "Updates and disk space"
 msgstr ""
 
-#: crates/app/src/preferences.rs:391
+#: crates/app/src/preferences.rs:398
 msgid "Keep a restore point"
 msgstr ""
 
-#: crates/app/src/preferences.rs:392
+#: crates/app/src/preferences.rs:399
 msgid ""
 "Saves the current version before each update so you can go back (5–10 GB)."
 msgstr ""
 
-#: crates/app/src/preferences.rs:397
+#: crates/app/src/preferences.rs:404
 msgid "Keep the installer"
 msgstr ""
 
-#: crates/app/src/preferences.rs:398
+#: crates/app/src/preferences.rs:405
 msgid "Allows reinstalling without downloading again (3–12 GB)."
 msgstr ""
 
-#: crates/app/src/preferences.rs:404
+#: crates/app/src/preferences.rs:411
 msgid "Watch folders"
 msgstr ""
 
-#: crates/app/src/preferences.rs:406
+#: crates/app/src/preferences.rs:413
 msgid "Files placed in these folders are converted automatically."
 msgstr ""
 
-#: crates/app/src/preferences.rs:410
+#: crates/app/src/preferences.rs:417
 msgid "Convert in the background"
 msgstr ""
 
-#: crates/app/src/preferences.rs:411
+#: crates/app/src/preferences.rs:418
 msgid "Keeps converting with Vinci closed, with an icon in the system tray."
 msgstr ""
 
-#: crates/app/src/preferences.rs:418
+#: crates/app/src/preferences.rs:425
 msgid "Import folder (convert for editing)"
 msgstr ""
 
-#: crates/app/src/preferences.rs:426
+#: crates/app/src/preferences.rs:433
 msgid "Export folder (convert renders to MP4)"
 msgstr ""
 
-#: crates/app/src/preferences.rs:434
+#: crates/app/src/preferences.rs:441
 msgid "Logs"
 msgstr ""
 
-#: crates/app/src/preferences.rs:436
+#: crates/app/src/preferences.rs:443
 msgid "Save activity logs"
 msgstr ""
 
-#: crates/app/src/preferences.rs:437
+#: crates/app/src/preferences.rs:444
 msgid ""
 "Off by default. Records the commands Vinci runs and what they print in a "
 "file on this computer, with your user name hidden. Nothing is sent anywhere; "
 "attach the file yourself when asking for help."
 msgstr ""
 
-#: crates/app/src/preferences.rs:444
+#: crates/app/src/preferences.rs:451
 msgid "Open the logs folder"
 msgstr ""
 
-#: crates/app/src/service.rs:65
+#: crates/app/src/service.rs:69
 msgid "Open Vinci"
 msgstr ""
 
@@ -941,37 +950,37 @@ msgid "Pause conversions"
 msgstr ""
 
 #: crates/app/src/service.rs:87
-msgid "Quit background service"
+msgid "Quit Vinci"
 msgstr ""
 
-#: crates/app/src/service.rs:220 crates/app/src/service.rs:314
+#: crates/app/src/service.rs:298 crates/app/src/service.rs:392
 msgid "Watching your folders"
 msgstr ""
 
-#: crates/app/src/service.rs:248
+#: crates/app/src/service.rs:326
 msgid "No folder to watch: choose one in Preferences"
 msgstr ""
 
-#: crates/app/src/service.rs:250
+#: crates/app/src/service.rs:328
 msgid "Background conversion is off"
 msgstr ""
 
-#: crates/app/src/service.rs:258
+#: crates/app/src/service.rs:336
 msgid "Paused"
 msgstr ""
 
-#: crates/app/src/service.rs:263
+#: crates/app/src/service.rs:341
 msgid "Waiting for DaVinci Resolve to be installed"
 msgstr ""
 
-#: crates/app/src/service.rs:279 crates/app/src/service.rs:282
+#: crates/app/src/service.rs:357 crates/app/src/service.rs:360
 msgid "Converting"
 msgstr ""
 
-#: crates/app/src/service.rs:301
+#: crates/app/src/service.rs:379
 msgid "Conversion finished"
 msgstr ""
 
-#: crates/app/src/service.rs:307
+#: crates/app/src/service.rs:385
 msgid "Conversion failed"
 msgstr ""
