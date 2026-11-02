@@ -11,3 +11,4 @@ Terminal=false
 Categories=AudioVideo;Video;
 Keywords=davinci;resolve;video;editor;installer;codec;convert;
 StartupNotify=true
+StartupWMClass=io.github.dionatansimioni.Vinci

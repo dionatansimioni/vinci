@@ -85,14 +85,44 @@ pub fn appimage_entry(appimage: &str) -> String {
 /// Installs the icon, and for the AppImage the menu entry, in the user's data dir.
 /// Wayland taskbars find a window's icon through the `.desktop` file named after its app
 /// ID, so without these the AppImage shows a generic icon. Flatpak installs both itself.
+///
+/// When an AppImage manager (Gear Lever, AppImageLauncher...) already made a menu entry for
+/// this file, ours would be a second Vinci in the menu, the taskbar and the manager's own
+/// list, so it is left out (and removed, if an older run wrote it). Theirs is a copy of the
+/// bundled entry, whose `StartupWMClass` ties the window to it.
 pub fn integrate(data_home: &Path, appimage: Option<&str>) -> std::io::Result<()> {
     let icon = data_home.join(format!("icons/hicolor/scalable/apps/{APP_ID}.svg"));
     write_if_changed(&icon, ICON)?;
     if let Some(path) = appimage {
-        let entry = data_home.join(format!("applications/{APP_ID}.desktop"));
-        write_if_changed(&entry, appimage_entry(path).as_bytes())?;
+        let apps = data_home.join("applications");
+        let ours = apps.join(format!("{APP_ID}.desktop"));
+        if launched_by_other_entry(&apps, &ours, path) {
+            // Only an entry we wrote for an AppImage (it has TryExec); never a native install's.
+            if std::fs::read_to_string(&ours).is_ok_and(|c| c.contains("\nTryExec=")) {
+                std::fs::remove_file(&ours)?;
+            }
+        } else {
+            write_if_changed(&ours, appimage_entry(path).as_bytes())?;
+        }
     }
     Ok(())
+}
+
+/// Whether some other `.desktop` file in `apps` runs this AppImage.
+fn launched_by_other_entry(apps: &Path, ours: &Path, appimage: &str) -> bool {
+    let Ok(dir) = std::fs::read_dir(apps) else {
+        return false;
+    };
+    dir.flatten().any(|e| {
+        let p = e.path();
+        p != ours
+            && p.extension().is_some_and(|x| x == "desktop")
+            && std::fs::read_to_string(&p).is_ok_and(|c| {
+                c.lines().any(|l| {
+                    (l.starts_with("Exec=") || l.starts_with("TryExec=")) && l.contains(appimage)
+                })
+            })
+    })
 }
 
 fn write_if_changed(path: &Path, content: &[u8]) -> std::io::Result<()> {
@@ -158,6 +188,36 @@ mod tests {
         let native = dir.join("native");
         integrate(&native, None).unwrap();
         assert!(!native.join("applications").exists());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn bundled_entry_ties_the_window_to_copies_of_it() {
+        // Gear Lever and others copy the entry under another name; the taskbar then
+        // matches our window (app ID) to the copy through StartupWMClass.
+        assert!(DESKTOP_ENTRY.contains(&format!("\nStartupWMClass={APP_ID}\n")));
+    }
+
+    #[test]
+    fn integrate_leaves_the_menu_to_an_appimage_manager() {
+        let dir = std::env::temp_dir().join(format!("vinci-gearlever-{}", std::process::id()));
+        let apps = dir.join("applications");
+        let ours = apps.join(format!("{APP_ID}.desktop"));
+        let appimage = "/home/u/AppImages/vinci.appimage";
+        // An older run already wrote our entry; then Gear Lever made its own.
+        integrate(&dir, Some("/home/u/Downloads/Vinci-0.4.6-x86_64.AppImage")).unwrap();
+        assert!(ours.exists());
+        std::fs::write(
+            apps.join("vinci.desktop"),
+            format!("[Desktop Entry]\nName=Vinci\nTryExec={appimage}\nExec={appimage}\n"),
+        )
+        .unwrap();
+        integrate(&dir, Some(appimage)).unwrap();
+        assert!(!ours.exists(), "duplicate menu entry left behind");
+        assert!(apps.join("vinci.desktop").exists());
+        // Another AppImage of Vinci, not managed: it still gets our entry.
+        integrate(&dir, Some("/opt/Vinci.AppImage")).unwrap();
+        assert!(ours.exists());
         std::fs::remove_dir_all(dir).unwrap();
     }
 }
