@@ -77,6 +77,15 @@ pub struct Report {
 }
 
 impl Report {
+    pub fn choose_gpu(&mut self, gpu: &Gpu) {
+        self.chosen_gpu = Some(gpu.clone());
+        for finding in &mut self.findings {
+            if let Finding::Hybrid { chosen } = finding {
+                *chosen = gpu.clone();
+            }
+        }
+    }
+
     pub fn is_blocked(&self) -> bool {
         self.findings
             .iter()
@@ -190,6 +199,18 @@ mod tests {
         assert!(r.findings.is_empty(), "{:?}", r.findings);
         assert!(!r.is_blocked());
         assert_eq!(r.chosen_gpu.unwrap().vendor, Vendor::Nvidia);
+    }
+
+    #[test]
+    fn preferred_gpu_updates_the_hybrid_message() {
+        let mut sys = healthy();
+        let amd = g(Vendor::Amd, 0x66af, "amdgpu");
+        sys.gpus.push(amd.clone());
+        let mut report = check(&sys);
+        assert_ne!(report.chosen_gpu.as_ref(), Some(&amd));
+        report.choose_gpu(&amd);
+        assert_eq!(report.chosen_gpu.as_ref(), Some(&amd));
+        assert!(report.findings.contains(&Finding::Hybrid { chosen: amd }));
     }
 
     #[test]

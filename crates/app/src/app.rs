@@ -248,7 +248,7 @@ fn probe() -> (Report, Vec<Gpu>, Option<Distro>) {
 /// Honours the GPU picked in Preferences when it is still present and usable.
 fn apply_gpu_choice(report: &mut Report, gpus: &[Gpu]) {
     if let Some(g) = settings().choose_gpu(gpus) {
-        report.chosen_gpu = Some(g.clone());
+        report.choose_gpu(g);
     }
 }
 
