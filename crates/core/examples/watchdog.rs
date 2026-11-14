@@ -30,6 +30,11 @@ impl Report {
     }
 }
 
+/// Single-quotes a value for `sh -c`.
+fn sh_quote(s: &str) -> String {
+    format!("'{}'", s.replace('\'', "'\\''"))
+}
+
 fn curl(args: &[&str]) -> Option<String> {
     let out = Command::new("curl")
         .args([
@@ -111,12 +116,12 @@ fn main() {
     let mut packages: Vec<&str> = recipe.packages.base.iter().map(String::as_str).collect();
     for (_, v) in &vendors {
         if let Some(repo) = &v.apt_repo {
-            // Recipe fields are validated (https URLs, plain tokens), safe to inline here.
+            // Quoted: URLs can carry shell characters (the Intel key URL has `&`).
             script.push_str(&format!(
-                "curl -fsSL {} -o {}; echo '{}' > /etc/apt/sources.list.d/{}.list; ",
-                repo.key_url,
-                repo.keyring_path(),
-                repo.source_line(),
+                "curl -fsSL {} -o {}; echo {} > /etc/apt/sources.list.d/{}.list; ",
+                sh_quote(&repo.key_url),
+                sh_quote(&repo.keyring_path()),
+                sh_quote(&repo.source_line()),
                 repo.name
             ));
         }
@@ -140,11 +145,19 @@ fn main() {
         Ok(o) => {
             let stdout = String::from_utf8_lossy(&o.stdout);
             let stderr = String::from_utf8_lossy(&o.stderr);
-            let last = stderr
+            let mut last = stderr
                 .lines()
                 .filter(|l| l.starts_with("E:"))
                 .collect::<Vec<_>>()
                 .join("; ");
+            // Not an apt error (curl, a shell command...): show the end of the output.
+            if last.is_empty() && !stdout.contains("SIMULATION_OK") {
+                let lines: Vec<&str> = stderr.lines().filter(|l| !l.trim().is_empty()).collect();
+                last = lines[lines.len().saturating_sub(5)..].join("; ");
+                if last.is_empty() {
+                    last = format!("exit status {}", o.status);
+                }
+            }
             (
                 stdout.contains("SIMULATION_OK"),
                 if last.is_empty() {
