@@ -1,5 +1,6 @@
 crates/app/src/about.rs
 crates/app/src/app.rs
+crates/app/src/app_update.rs
 crates/app/src/desktop.rs
 crates/app/src/i18n.rs
 crates/app/src/main.rs

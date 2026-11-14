@@ -56,6 +56,8 @@ Arch, openSUSE, Mint, Pop!_OS, Bazzite and others, and your system libraries are
   - Resolve updates are done in place, and the container's drivers are updated with them.
   - A restore point is saved before each update, with **Go back to this version**.
   - A copy of the last working installer is kept.
+  - Vinci updates itself: the AppImage shows when a new version is out, downloads it,
+    checks it and restarts into it with one click.
 - **Free and Studio.** Studio can be activated with a license key or a USB dongle. Safe udev
   rules cover the dongle, Speed Editor and panels. Switching edition installs into a new
   container.

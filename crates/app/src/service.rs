@@ -238,12 +238,48 @@ fn notify(summary: &str, body: &str) {
 
 /// An exclusive lock on a file in the runtime dir, held as long as the file stays open.
 fn runtime_lock(name: &str) -> Option<std::fs::File> {
-    let dir = std::env::var_os("XDG_RUNTIME_DIR")
-        .map(std::path::PathBuf::from)
-        .unwrap_or_else(std::env::temp_dir);
-    let file = std::fs::File::create(dir.join(name)).ok()?;
+    let file = std::fs::File::create(runtime_dir().join(name)).ok()?;
     rustix::fs::flock(&file, rustix::fs::FlockOperation::NonBlockingLockExclusive).ok()?;
     Some(file)
+}
+
+fn runtime_dir() -> std::path::PathBuf {
+    std::env::var_os("XDG_RUNTIME_DIR")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+}
+
+/// Where an update leaves the new AppImage's path for the running service.
+fn successor_file() -> std::path::PathBuf {
+    runtime_dir().join("vinci-watch.next")
+}
+
+/// Called after Vinci updated itself: the service notices its AppImage was replaced,
+/// finishes the file it is converting and starts again from `appimage`.
+pub fn hand_over(appimage: &std::path::Path) {
+    let _ = std::fs::write(successor_file(), appimage.as_os_str().as_encoded_bytes());
+}
+
+/// The AppImage this process runs from, with its inode, to notice an update replacing it.
+fn origin() -> Option<(std::path::PathBuf, u64)> {
+    use std::os::unix::fs::MetadataExt;
+    let path = std::path::PathBuf::from(std::env::var_os("APPIMAGE")?);
+    let ino = path.metadata().ok()?.ino();
+    Some((path, ino))
+}
+
+/// Whether the file at the origin path is gone or is another file now.
+fn replaced(origin: &(std::path::PathBuf, u64)) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    origin.0.metadata().map_or(true, |m| m.ino() != origin.1)
+}
+
+/// The AppImage to restart the service from after an update: the one the update named,
+/// else the same path (updated in place).
+fn successor(origin: &std::path::Path, note: Option<String>) -> Option<std::path::PathBuf> {
+    note.map(std::path::PathBuf::from)
+        .filter(|p| p.is_file())
+        .or_else(|| origin.is_file().then(|| origin.to_path_buf()))
 }
 
 /// Keeps a single service per user: the lock lives as long as the process.
@@ -310,9 +346,11 @@ fn engine() -> Option<(Engine, ImportPreset, Option<gpu::Gpu>)> {
 }
 
 pub fn run() -> i32 {
-    let Some(_lock) = single_instance() else {
+    let Some(lock) = single_instance() else {
         return 0; // already running
     };
+    let origin = origin();
+    let mut updated = false;
     let paused = Arc::new(AtomicBool::new(false));
     let quit = Arc::new(AtomicBool::new(false));
     // At login this can start before the desktop's tray (Cinnamon's xapp-sn-watcher, KDE's
@@ -344,6 +382,11 @@ pub fn run() -> i32 {
     // Probing encoders takes a few seconds; do it once per codec.
     let mut encoders: Option<(VideoCodec, Vec<Encoder>)> = None;
     while !quit.load(Ordering::Relaxed) {
+        // Checked between files, so an update never cuts a conversion short.
+        if origin.as_ref().is_some_and(replaced) {
+            updated = true;
+            break;
+        }
         let settings = Settings::load(&Settings::default_path());
         match mode(&settings, app_open()) {
             Mode::Stop => break,
@@ -421,12 +464,25 @@ pub fn run() -> i32 {
     if let Some(t) = tray {
         t.shutdown().wait();
     }
+    if let (true, Some((path, _))) = (updated, &origin) {
+        let note = std::fs::read_to_string(successor_file()).ok();
+        let _ = std::fs::remove_file(successor_file());
+        drop(lock);
+        if let Some(next) = successor(path, note) {
+            let _ = std::process::Command::new(next)
+                .arg("--watch")
+                .stdin(std::process::Stdio::null())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn();
+        }
+    }
     0
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{mode, on_close, remember_close_answer, Mode, OnClose};
+    use super::{mode, on_close, remember_close_answer, replaced, successor, Mode, OnClose};
     use rli_core::settings::Settings;
 
     /// The icon stays while the window is open; conversions need folders and the switch.
@@ -482,5 +538,30 @@ mod tests {
             assert!(i.data.as_chunks::<4>().0.iter().any(|px| px[0] == 255));
         }
         assert_eq!((icons[1].width, icons[1].height), (22, 22));
+    }
+
+    #[test]
+    fn notices_an_update_and_finds_the_new_appimage() {
+        use std::os::unix::fs::MetadataExt;
+        let dir = std::env::temp_dir().join(format!("vinci-handover-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let old = dir.join("Vinci-0.4.9-x86_64.AppImage");
+        std::fs::write(&old, "old").unwrap();
+        let origin = (old.clone(), old.metadata().unwrap().ino());
+        assert!(!replaced(&origin));
+        // Replaced in place (rename over it): new inode, same path.
+        let part = dir.join(".part");
+        std::fs::write(&part, "new").unwrap();
+        std::fs::rename(&part, &old).unwrap();
+        assert!(replaced(&origin));
+        assert_eq!(successor(&old, None), Some(old.clone()));
+        // Renamed to the new version: the update's note says where.
+        let new = dir.join("Vinci-0.5.0-x86_64.AppImage");
+        std::fs::rename(&old, &new).unwrap();
+        assert!(replaced(&origin));
+        assert_eq!(successor(&old, None), None);
+        let note = Some(new.to_string_lossy().into_owned());
+        assert_eq!(successor(&old, note), Some(new));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

@@ -22,7 +22,7 @@ Este documento registra as decisões de design tomadas antes da implementação.
 - Rust + gtk4-rs + libadwaita + relm4.
 - Lógica em uma crate `core` sem dependência de GTK (testável); UI fina em cima.
 - Execução de comandos no host abstraída: direta (AppImage) ou via `flatpak-spawn --host` (Flatpak).
-- **Flatpak no Flathub** (principal) + **AppImage** no GitHub Releases com zsync (plano B). Aviso de atualização do app só na AppImage.
+- **Flatpak no Flathub** (principal) + **AppImage** no GitHub Releases com zsync (plano B). Atualização do app só na AppImage: na abertura, consulta o último release no GitHub; o botão da faixa baixa a AppImage nova, confere o SHA-256 publicado pelo GitHub e a troca no lugar (arquivo `Vinci-X.Y.Z-x86_64.AppImage` ganha o nome da versão nova; outro nome, como o de gerenciadores, é mantido) e oferece reiniciar. Sem permissão de escrita, sem checksum ou com erro, o botão abre a página de releases. O serviço em segundo plano percebe a troca entre um arquivo e outro e reinicia pela AppImage nova.
 
 ## 3. Host
 

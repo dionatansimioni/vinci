@@ -1,5 +1,6 @@
 //! Main window: system check → choose installer → (host setup) → progress → done/error.
 
+use crate::app_update::{self, AppUpdate};
 use crate::i18n::tr;
 use crate::media::Media;
 use crate::messages;
@@ -143,6 +144,8 @@ pub struct App {
     backup: Option<rli_core::state::Installation>,
     restoring: bool,
     usb_configured: bool,
+    /// A new version of Vinci itself (AppImage only).
+    app_update: AppUpdate,
 }
 
 #[derive(Debug)]
@@ -181,6 +184,8 @@ pub enum Msg {
     CancelInstall,
     Back,
     Tick,
+    /// The "new version of Vinci" banner's button.
+    UpdateVinci,
 }
 
 #[derive(Debug)]
@@ -205,6 +210,8 @@ pub enum Cmd {
     /// Cleanup after a cancel finished; names of tools that could not be removed.
     CancelCleaned(Vec<String>),
     PackagesUpdated(Result<(), (String, String)>),
+    VinciRelease(rli_core::app_update::Release),
+    VinciInstalled(Result<PathBuf, String>),
 }
 
 pub struct Widgets {
@@ -218,6 +225,7 @@ pub struct Widgets {
     usb_row: adw::ActionRow,
     usb_button: gtk::Button,
     banner: adw::Banner,
+    app_banner: adw::Banner,
     stack: gtk::Stack,
     status: adw::StatusPage,
     check_group: adw::PreferencesGroup,
@@ -250,6 +258,22 @@ fn apply_gpu_choice(report: &mut Report, gpus: &[Gpu]) {
     if let Some(g) = settings().choose_gpu(gpus) {
         report.choose_gpu(g);
     }
+}
+
+/// Asks GitHub whether a newer Vinci exists. AppImage only: Flatpak updates come from the
+/// store, native builds from the package manager. Offline: nothing happens.
+fn check_app_update(sender: &ComponentSender<App>) {
+    if app_update::running_appimage().is_none() {
+        return;
+    }
+    sender.spawn_command(|out| {
+        let current = env!("CARGO_PKG_VERSION")
+            .parse()
+            .expect("valid crate version");
+        if let Some(r) = rli_core::app_update::check(&remote::Http::new(), &current) {
+            let _ = out.send(Cmd::VinciRelease(r));
+        }
+    });
 }
 
 /// Makes the session autostart match the settings and starts the service right away.
@@ -566,6 +590,7 @@ impl Component for App {
             restoring: false,
             usb_configured: State::load(&State::default_path())
                 .is_ok_and(|s| !s.udev_rules.is_empty()),
+            app_update: AppUpdate::None,
         };
         let input = |m: fn() -> Msg| {
             let sender = sender.clone();
@@ -729,6 +754,11 @@ impl Component for App {
             let sender = sender.clone();
             move |_| sender.input(Msg::Proceed)
         });
+        let app_banner = adw::Banner::new("");
+        app_banner.connect_button_clicked({
+            let sender = sender.clone();
+            move |_| sender.input(Msg::UpdateVinci)
+        });
         let views = adw::ViewStack::new();
         let install_page = views.add_titled(&stack, Some("install"), &tr("Installation"));
         install_page.set_icon_name(Some("system-software-install-symbolic"));
@@ -761,12 +791,14 @@ impl Component for App {
         header.set_title_widget(Some(&switcher));
         let toolbar = adw::ToolbarView::new();
         toolbar.add_top_bar(&header);
+        toolbar.add_top_bar(&app_banner);
         toolbar.add_top_bar(&banner);
         toasts.set_child(Some(&views));
         toolbar.set_content(Some(&toasts));
         root.set_content(Some(&toolbar));
 
         model.check_updates(&sender);
+        check_app_update(&sender);
         sender.input(Msg::RunHealth);
         sender.input(Msg::PollStatus);
         gtk::glib::timeout_add_seconds_local(STATUS_POLL_SECS, {
@@ -795,6 +827,7 @@ impl Component for App {
             usb_row,
             usb_button,
             banner,
+            app_banner,
             stack,
             status,
             check_group,
@@ -828,6 +861,32 @@ impl Component for App {
                 self.page = Page::Source;
             }
             Msg::Tick => {}
+            Msg::UpdateVinci => {
+                let appimage = app_update::running_appimage();
+                match self.app_update.action(appimage.as_deref()) {
+                    app_update::Action::Download => {
+                        let (AppUpdate::Available(release), Some(path)) =
+                            (std::mem::take(&mut self.app_update), appimage)
+                        else {
+                            return;
+                        };
+                        self.app_update = AppUpdate::Downloading(release.clone());
+                        sender.spawn_command(move |out| {
+                            let _ =
+                                out.send(Cmd::VinciInstalled(app_update::install(&release, &path)));
+                        });
+                    }
+                    app_update::Action::OpenReleases => {
+                        gtk::UriLauncher::new(rli_core::app_update::RELEASES_PAGE).launch(
+                            Some(root),
+                            None::<&gio::Cancellable>,
+                            |_| {},
+                        );
+                    }
+                    app_update::Action::Restart(path) => app_update::restart(&path),
+                    app_update::Action::Nothing => {}
+                }
+            }
             Msg::Back => {
                 stop_watching(&mut self.watching);
                 self.page = Page::Check;
@@ -1213,6 +1272,16 @@ impl Component for App {
                 self.progress.step = tr("Recreating the container and trying again");
             }
             Cmd::Progress(Event::Finished { .. }) => {}
+            Cmd::VinciRelease(release) => self.app_update = AppUpdate::Available(release),
+            Cmd::VinciInstalled(result) => {
+                self.app_update = match result {
+                    Ok(path) => {
+                        crate::service::hand_over(&path);
+                        AppUpdate::Ready(path)
+                    }
+                    Err(e) => AppUpdate::Failed(e),
+                }
+            }
             Cmd::Update(edition, info) => {
                 self.updates.retain(|(e, _)| *e != edition);
                 self.updates.push((edition, info));
@@ -1418,6 +1487,8 @@ impl Component for App {
             }
             _ => w.banner.set_revealed(false),
         }
+        self.app_update
+            .render(&w.app_banner, app_update::running_appimage().as_deref());
 
         let distro = self
             .distro

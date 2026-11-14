@@ -34,6 +34,20 @@ impl Http {
     }
 }
 
+/// Opens a large download (the Vinci AppImage) as a stream. No overall time limit, only
+/// for connecting and for each read, so slow connections still finish.
+pub fn download(url: &str) -> Result<Box<dyn std::io::Read + Send>, String> {
+    let config = ureq::Agent::config_builder()
+        .timeout_connect(Some(Duration::from_secs(15)))
+        .timeout_recv_body(None)
+        .timeout_recv_response(Some(Duration::from_secs(30)))
+        .user_agent(concat!("Vinci/", env!("CARGO_PKG_VERSION")))
+        .build();
+    let agent: ureq::Agent = config.into();
+    let response = agent.get(url).call().map_err(|e| e.to_string())?;
+    Ok(Box::new(response.into_body().into_reader()))
+}
+
 impl Default for Http {
     fn default() -> Self {
         Self::new()

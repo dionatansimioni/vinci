@@ -59,6 +59,8 @@ sem alterar as bibliotecas do seu sistema.
   - O Resolve é atualizado no lugar, e os drivers do container são atualizados junto.
   - Um ponto de restauração é salvo antes de cada atualização, com **Voltar a esta versão**.
   - Uma cópia do último instalador que funcionou fica guardada.
+  - O Vinci se atualiza sozinho: a AppImage avisa quando sai uma versão nova, baixa, confere
+    e reinicia nela com um clique.
 - **Free e Studio.** O Studio pode ser ativado com chave de licença ou dongle USB. Regras
   udev seguras cobrem o dongle, o Speed Editor e os painéis. Trocar de edição instala num
   container novo.

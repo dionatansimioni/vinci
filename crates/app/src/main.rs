@@ -1,5 +1,6 @@
 mod about;
 mod app;
+mod app_update;
 mod desktop;
 mod i18n;
 mod media;
