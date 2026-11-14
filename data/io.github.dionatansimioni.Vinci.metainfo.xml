@@ -63,6 +63,11 @@
     <display_length compare="ge">360</display_length>
   </requires>
   <releases>
+    <release version="0.4.8" date="2026-11-14">
+      <description>
+        <p>On computers with more than one graphics card, the system check now names the card chosen in Preferences in every message.</p>
+      </description>
+    </release>
     <release version="0.4.7" date="2026-11-02">
       <description>
         <p>No more duplicate Vinci icon in the taskbar and in Gear Lever when the AppImage is installed by an AppImage manager.</p>
